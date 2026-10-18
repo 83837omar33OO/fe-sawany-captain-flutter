@@ -15,17 +15,13 @@ rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
-subprojects {
-    project.evaluationDependsOn(":app")
-}
-
-subprojects {
+subprojects { project ->
     project.ext {
         compileSdkVersion = 35
         targetSdkVersion = 35
         minSdkVersion = 23
     }
-    afterEvaluate { project ->
+    def configureAndroid = {
         if (project.hasProperty("android")) {
             project.android {
                 compileSdkVersion 35
@@ -35,6 +31,17 @@ subprojects {
             }
         }
     }
+    if (project.state.executed) {
+        configureAndroid()
+    } else {
+        project.afterEvaluate {
+            configureAndroid()
+        }
+    }
+}
+
+subprojects {
+    project.evaluationDependsOn(":app")
 }
 
 tasks.register("clean", Delete) {
