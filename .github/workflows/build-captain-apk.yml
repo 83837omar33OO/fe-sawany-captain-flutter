@@ -9,6 +9,8 @@ jobs:
   build-apk:
     name: Build Production Android APK (Cloud CI)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout Repository
