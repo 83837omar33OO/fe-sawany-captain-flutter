@@ -12,6 +12,23 @@ class RadarRepository {
         .toList();
   }
 
+  Future<Map<String, dynamic>> fetchRadarData() async {
+    final response = await ApiClient.get(ApiEndpoints.orders);
+    final rawAvailable = response["availableOrders"] as List<dynamic>? ?? [];
+    final rider = response["rider"] as Map<String, dynamic>? ?? {};
+    final isOnline = rider["isOnline"] == true || rider["isAvailable"] == true;
+
+    final orders = rawAvailable
+        .map((item) => AvailableOrder.fromJson(item as Map<String, dynamic>))
+        .toList();
+
+    return {
+      "orders": orders,
+      "isOnline": isOnline,
+      "rider": rider,
+    };
+  }
+
   Future<void> claimOrder(String orderId) async {
     await ApiClient.post(ApiEndpoints.orders, {
       "orderId": orderId,
