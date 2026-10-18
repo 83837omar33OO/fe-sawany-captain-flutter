@@ -1,0 +1,44 @@
+name: fe_sawany_captain
+description: "تطبيق أسطول كباتن وطيارين في ثواني - منصة التوصيل السريع"
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Networking & Realtime
+  http: ^1.2.2
+  connectivity_plus: ^6.0.5
+
+  # Storage & Caching
+  shared_preferences: ^2.3.2
+  flutter_secure_storage: ^9.2.2
+
+  # Hardware, Location & Dialing
+  geolocator: ^13.0.1
+  flutter_foreground_task: ^8.17.0
+  url_launcher: ^6.3.0
+
+  # Alerting & Haptics
+  audioplayers: ^6.0.0
+
+  # Utilities & UI
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/audio/
+    - assets/images/
