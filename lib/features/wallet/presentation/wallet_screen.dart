@@ -41,6 +41,7 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   void _showSettlementDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final amountController = TextEditingController(
       text: _summary?.remainingDue.toStringAsFixed(0) ?? "0",
     );
@@ -51,26 +52,44 @@ class _WalletScreenState extends State<WalletScreen> {
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text("طلب تسوية وتوريد عهدة"),
+          title: Text(
+            "طلب تسوية وتوريد عهدة",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : AppColors.slateDark,
+            ),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 "أدخل المبلغ النقدي الذي ستقوم بتوريده للمكتب أو المشرف الميداني:",
-                style: TextStyle(fontSize: 12, color: AppColors.slateLight),
+                style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : AppColors.slateLight),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: amountController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: "المبلغ المورد (ج.م)"),
+                style: TextStyle(fontSize: 14, color: isDark ? Colors.white : AppColors.slateDark),
+                decoration: InputDecoration(
+                  labelText: "المبلغ المورد (ج.م)",
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                ),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: noteController,
-                decoration: const InputDecoration(labelText: "ملاحظات التسوية (اختياري)"),
+                style: TextStyle(fontSize: 14, color: isDark ? Colors.white : AppColors.slateDark),
+                decoration: InputDecoration(
+                  labelText: "ملاحظات التسوية (اختياري)",
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                ),
               ),
             ],
           ),
@@ -80,7 +99,10 @@ class _WalletScreenState extends State<WalletScreen> {
               child: const Text("إلغاء"),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
               onPressed: () async {
                 Navigator.pop(ctx);
                 final amt = double.tryParse(amountController.text) ?? 0.0;
@@ -113,6 +135,8 @@ class _WalletScreenState extends State<WalletScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -126,8 +150,11 @@ class _WalletScreenState extends State<WalletScreen> {
                 children: [
                   // Main Cash Custody Card
                   Card(
-                    color: AppColors.primaryDark,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    color: const Color(0xFF0F172A),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFF1E293B)),
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.all(20),
                       child: Column(
@@ -150,7 +177,7 @@ class _WalletScreenState extends State<WalletScreen> {
                           ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primaryMint,
-                              foregroundColor: AppColors.primaryDark,
+                              foregroundColor: const Color(0xFF0F172A),
                             ),
                             icon: const Icon(Icons.handshake_outlined),
                             label: const Text("طلب تصفية وتوريد العهدة للمكتب"),
@@ -169,8 +196,8 @@ class _WalletScreenState extends State<WalletScreen> {
                         child: _buildMetricBox(
                           title: "أرباحك المستحقة اليوم",
                           value: "${_summary?.todayEarnings.toStringAsFixed(0) ?? '0'} ج.م",
-                          color: AppColors.primary,
-                          bgColor: AppColors.primaryLight,
+                          color: isDark ? AppColors.primaryMint : AppColors.primary,
+                          bgColor: isDark ? const Color(0xFF064E3B).withOpacity(0.4) : AppColors.primaryLight,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -178,8 +205,8 @@ class _WalletScreenState extends State<WalletScreen> {
                         child: _buildMetricBox(
                           title: "طلبات تم تسليمها",
                           value: "${_summary?.todayDeliveredCount ?? 0} طلب",
-                          color: AppColors.info,
-                          bgColor: AppColors.infoLight,
+                          color: isDark ? const Color(0xFF38BDF8) : AppColors.info,
+                          bgColor: isDark ? const Color(0xFF0C4A6E).withOpacity(0.4) : AppColors.infoLight,
                         ),
                       ),
                     ],
@@ -188,25 +215,30 @@ class _WalletScreenState extends State<WalletScreen> {
 
                   // Ledger Rules Guide Card
                   Card(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Row(
+                          Row(
                             children: [
-                              Icon(Icons.info_outline, size: 20, color: AppColors.primary),
-                              SizedBox(width: 8),
+                              const Icon(Icons.info_outline, size: 20, color: AppColors.primaryMint),
+                              const SizedBox(width: 8),
                               Text(
                                 "قواعد الحسابات والعهدة النقدية:",
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : AppColors.slateDark,
+                                ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 10),
-                          _buildRuleLine("1. الكاش المحصل من العميل يمثل عهدة لصالح المحل والإدارة."),
-                          _buildRuleLine("2. أجر مشوار التوصيل يُضاف لمحفظتك فور الضغط على تم التسليم."),
-                          _buildRuleLine("3. تسوية العهدة تتطلب تأكيد الكابتن والمشرف لضمان حقوق الطرفين."),
+                          _buildRuleLine("1. الكاش المحصل من العميل يمثل عهدة لصالح المحل والإدارة.", isDark),
+                          _buildRuleLine("2. أجر مشوار التوصيل يُضاف لمحفظتك فور الضغط على تم التسليم.", isDark),
+                          _buildRuleLine("3. تسوية العهدة تتطلب تأكيد الكابتن والمشرف لضمان حقوق الطرفين.", isDark),
                         ],
                       ),
                     ),
@@ -243,10 +275,16 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _buildRuleLine(String text) {
+  Widget _buildRuleLine(String text, bool isDark) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: Text(text, style: const TextStyle(fontSize: 12, color: AppColors.slateMedium)),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          color: isDark ? const Color(0xFF94A3B8) : AppColors.slateMedium,
+        ),
+      ),
     );
   }
 }

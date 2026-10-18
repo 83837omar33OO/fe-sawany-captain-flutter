@@ -7,14 +7,7 @@ import '../settings/presentation/settings_screen.dart';
 import '../active_delivery/data/active_order_repository.dart';
 
 class MainShell extends StatefulWidget {
-  final Function(ThemeMode)? onThemeChanged;
-  final ThemeMode currentTheme;
-
-  const MainShell({
-    super.key,
-    this.onThemeChanged,
-    this.currentTheme = ThemeMode.system,
-  });
+  const MainShell({super.key});
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -40,6 +33,8 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -54,10 +49,7 @@ class _MainShellState extends State<MainShell> {
             ),
             const ActiveDeliveriesTab(),
             const WalletScreen(),
-            SettingsScreen(
-              currentTheme: widget.currentTheme,
-              onThemeChanged: widget.onThemeChanged ?? (_) {},
-            ),
+            const SettingsScreen(),
           ],
         ),
         bottomNavigationBar: BottomNavigationBar(
@@ -67,8 +59,9 @@ class _MainShellState extends State<MainShell> {
             if (idx == 1) _refreshActiveCount();
           },
           type: BottomNavigationBarType.fixed,
-          selectedItemColor: AppColors.primary,
-          unselectedItemColor: const Color(0xFF64748B),
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          selectedItemColor: isDark ? AppColors.primaryMint : AppColors.primary,
+          unselectedItemColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
           selectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
           unselectedLabelStyle: const TextStyle(fontSize: 11),
           items: [

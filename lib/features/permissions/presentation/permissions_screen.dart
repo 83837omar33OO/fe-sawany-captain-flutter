@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/storage/secure_storage_service.dart';
+import '../../auth/presentation/login_screen.dart';
+import '../../shell/main_shell.dart';
 
 class PermissionsScreen extends StatefulWidget {
-  final VoidCallback onPermissionsGranted;
+  final VoidCallback? onPermissionsGranted;
 
-  const PermissionsScreen({super.key, required this.onPermissionsGranted});
+  const PermissionsScreen({super.key, this.onPermissionsGranted});
 
   @override
   State<PermissionsScreen> createState() => _PermissionsScreenState();
@@ -33,14 +36,30 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
           );
         }
       }
-
-      // Proceed
-      widget.onPermissionsGranted();
     } catch (_) {
-      widget.onPermissionsGranted();
     } finally {
-      if (mounted) setState(() => _isRequesting = false);
+      if (mounted) {
+        setState(() => _isRequesting = false);
+        _proceedNext();
+      }
     }
+  }
+
+  Future<void> _proceedNext() async {
+    if (widget.onPermissionsGranted != null) {
+      widget.onPermissionsGranted!();
+    }
+
+    final token = await SecureStorageService.getToken();
+    final isAuthenticated = token != null && token.isNotEmpty;
+
+    if (!mounted) return;
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => isAuthenticated ? const MainShell() : const LoginScreen(),
+      ),
+    );
   }
 
   @override

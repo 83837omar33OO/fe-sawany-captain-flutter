@@ -127,6 +127,8 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: Stack(
         children: [
@@ -199,21 +201,22 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.95),
+                      color: isDark ? const Color(0xFF1E293B).withOpacity(0.95) : Colors.white.withOpacity(0.95),
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.location_on, size: 14, color: AppColors.primary),
-                        SizedBox(width: 4),
+                        const Icon(Icons.location_on, size: 14, color: AppColors.primaryMint),
+                        const SizedBox(width: 4),
                         Text(
                           "قطاع العامرية ثان والناصرية",
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.slateDark,
+                            color: isDark ? Colors.white : AppColors.slateDark,
                           ),
                         ),
                       ],
@@ -224,10 +227,12 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: _isOnline ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                      color: _isOnline
+                          ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
+                          : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: _isOnline ? AppColors.primaryMint : const Color(0xFFCBD5E1),
+                        color: _isOnline ? AppColors.primaryMint : const Color(0xFF64748B),
                       ),
                     ),
                     child: Text(
@@ -235,7 +240,7 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: _isOnline ? AppColors.primary : AppColors.slateLight,
+                        color: _isOnline ? (isDark ? const Color(0xFFA7F3D0) : AppColors.primary) : (isDark ? const Color(0xFFCBD5E1) : AppColors.slateLight),
                       ),
                     ),
                   ),
@@ -249,8 +254,8 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
             left: 16,
             bottom: _availableOrders.isNotEmpty ? 220 : 100,
             child: FloatingActionButton.small(
-              backgroundColor: Colors.white,
-              foregroundColor: AppColors.slateDark,
+              backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+              foregroundColor: isDark ? Colors.white : AppColors.slateDark,
               elevation: 3,
               tooltip: "تحديد موقعي",
               onPressed: _fetchLiveLocation,
@@ -264,7 +269,7 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
               left: 16,
               right: 16,
               bottom: 92,
-              child: _buildIncomingOrderCard(_availableOrders.first),
+              child: _buildIncomingOrderCard(_availableOrders.first, isDark),
             ),
 
           // 5. Docked Bottom Control Bar (Online / Offline Toggle)
@@ -275,12 +280,12 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: const [
                   BoxShadow(color: Colors.black12, blurRadius: 10, spreadRadius: 1),
                 ],
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
               ),
               child: Row(
                 children: [
@@ -294,14 +299,14 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: _isOnline ? AppColors.primary : AppColors.slateLight,
+                            color: _isOnline ? (isDark ? AppColors.primaryMint : AppColors.primary) : (isDark ? const Color(0xFF94A3B8) : AppColors.slateLight),
                           ),
                         ),
                         Text(
                           _isOnline
                               ? "${_availableOrders.length} طلبات متاحة بالرادار"
                               : "اضغط لبدء استقبال الطلبات",
-                          style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                          style: TextStyle(fontSize: 10, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                         ),
                       ],
                     ),
@@ -311,6 +316,7 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _isOnline ? const Color(0xFFDC2626) : AppColors.primary,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
@@ -336,11 +342,11 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
     );
   }
 
-  Widget _buildIncomingOrderCard(AvailableOrder ord) {
+  Widget _buildIncomingOrderCard(AvailableOrder ord, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFFBBF24), width: 1.5),
         boxShadow: const [
@@ -356,17 +362,25 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
             children: [
               Text(
                 ord.storeName,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slateDark),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : AppColors.slateDark,
+                ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
+                  color: isDark ? const Color(0xFF064E3B) : AppColors.primaryLight,
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   "+${ord.deliveryEarning.toStringAsFixed(0)} ج.م أرباحك",
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? AppColors.primaryMint : AppColors.primary,
+                  ),
                 ),
               ),
             ],
@@ -374,17 +388,18 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
           const SizedBox(height: 6),
           Text(
             "المحل: ${ord.storeArea} • التسليم: ${ord.deliveryArea}",
-            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+            style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
           ),
           const SizedBox(height: 4),
           Text(
             "كاش الفاتورة: ${ord.orderValue.toStringAsFixed(0)} ج.م",
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFC2410C)),
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFFB923C)),
           ),
           const SizedBox(height: 10),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(38),
             ),
             onPressed: _isClaiming ? null : () => _claimOrder(ord.id),

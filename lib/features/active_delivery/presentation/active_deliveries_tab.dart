@@ -103,16 +103,17 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab> {
   void _showException(String orderId) {
     showDialog(
       context: context,
-      builder: (ctx) => DeliveryExceptionDialog(
-        onSubmit: (reason, details) async {
+      builder: (_) => DeliveryExceptionDialog(
+        orderId: orderId,
+        onSubmit: (reason, notes) async {
           setState(() => _isActionLoading = true);
           try {
-            await _activeRepo.reportException(orderId, reason, details);
+            await _activeRepo.reportDeliveryIssue(orderId, reason, notes);
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text("تم إرسال بلاغ التعثر للمشرف الميداني."),
-                  backgroundColor: AppColors.warning,
+                  content: Text("تم تسجيل البلاغ وإشعار غرفة العمليات والمشرف."),
+                  backgroundColor: AppColors.danger,
                 ),
               );
             }
@@ -128,6 +129,8 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("الطلبات الجارية والتوصيل"),
@@ -141,9 +144,13 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab> {
                     children: [
                       const Icon(Icons.check_circle_outline, size: 48, color: Color(0xFF94A3B8)),
                       const SizedBox(height: 12),
-                      const Text(
+                      Text(
                         "لا توجد طلبات جارية حالياً",
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slateDark),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : AppColors.slateDark,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       const Text(
@@ -155,26 +162,26 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab> {
                 )
               : RefreshIndicator(
                   onRefresh: _loadOrders,
-                  color: AppColors.primary,
                   child: ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: _orders.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (ctx, idx) => _buildOrderCard(_orders[idx]),
+                    itemBuilder: (ctx, idx) => _buildOrderCard(_orders[idx], isDark),
                   ),
                 ),
     );
   }
 
-  Widget _buildOrderCard(ActiveOrder ord) {
+  Widget _buildOrderCard(ActiveOrder ord, bool isDark) {
     final isOut = ord.status == "out_for_delivery";
+    final textColor = isDark ? Colors.white : AppColors.slateDark;
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
         boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
       ),
       child: Column(
@@ -214,13 +221,13 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab> {
               Expanded(
                 child: Text(
                   "المحل: ${ord.storeName} (${ord.storeAddress})",
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.slateDark),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
                 ),
               ),
-              if (ord.storePhone != null && ord.storePhone!.isNotEmpty)
+              if (ord.storePhone != null && (ord.storePhone?.isNotEmpty ?? false))
                 IconButton(
-                  icon: const Icon(Icons.phone, size: 16, color: AppColors.primary),
-                  onPressed: () => _dialPhone(ord.storePhone!),
+                  icon: const Icon(Icons.phone, size: 16, color: AppColors.primaryMint),
+                  onPressed: () => _dialPhone(ord.storePhone ?? ""),
                   visualDensity: VisualDensity.compact,
                 ),
               IconButton(
@@ -240,11 +247,11 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab> {
               Expanded(
                 child: Text(
                   "العميل: ${ord.customerName} (${ord.customerAddress})",
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.slateDark),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.phone_in_talk, size: 16, color: AppColors.primary),
+                icon: const Icon(Icons.phone_in_talk, size: 16, color: AppColors.primaryMint),
                 onPressed: () => _dialPhone(ord.customerPhone),
                 visualDensity: VisualDensity.compact,
               ),
@@ -255,17 +262,17 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab> {
               ),
             ],
           ),
-          if (ord.customerNotes != null && ord.customerNotes!.isNotEmpty)
+          if (ord.customerNotes != null && (ord.customerNotes?.isNotEmpty ?? false))
             Container(
               margin: const EdgeInsets.only(top: 6),
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFFBEB),
+                color: isDark ? const Color(0xFF451A03) : const Color(0xFFFFFBEB),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
                 "ملاحظات: ${ord.customerNotes}",
-                style: const TextStyle(fontSize: 11, color: Color(0xFFB45309)),
+                style: const TextStyle(fontSize: 11, color: Color(0xFFF59E0B)),
               ),
             ),
           const Divider(height: 16),
@@ -276,11 +283,11 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab> {
             children: [
               Text(
                 "أرباحك: +${ord.riderEarning.toStringAsFixed(0)} ج.م",
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryMint),
               ),
               Text(
                 "الكاش للتحصيل: ${ord.totalCashToCollect.toStringAsFixed(0)} ج.م",
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFC2410C)),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFFB923C)),
               ),
             ],
           ),

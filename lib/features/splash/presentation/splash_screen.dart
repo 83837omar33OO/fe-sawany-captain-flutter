@@ -40,7 +40,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (!mounted) return;
 
     // Check location permission
-    final perm = await Geolocator.checkPermission();
+    LocationPermission perm;
+    try {
+      perm = await Geolocator.checkPermission();
+    } catch (_) {
+      perm = LocationPermission.denied;
+    }
+
     final hasLocationPermission =
         perm == LocationPermission.always || perm == LocationPermission.whileInUse;
 
@@ -48,42 +54,18 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     final token = await SecureStorageService.getToken();
     final isAuthenticated = token != null && token.isNotEmpty;
 
+    if (!mounted) return;
+
     Widget nextScreen;
     if (!hasLocationPermission) {
-      nextScreen = PermissionsScreen(
-        onPermissionsGranted: () {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => isAuthenticated
-                  ? const MainShell()
-                  : LoginScreen(
-                      onLoginSuccess: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (_) => const MainShell()),
-                        );
-                      },
-                    ),
-            ),
-          );
-        },
-      );
+      nextScreen = const PermissionsScreen();
     } else if (isAuthenticated) {
       nextScreen = const MainShell();
     } else {
-      nextScreen = LoginScreen(
-        onLoginSuccess: () {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const MainShell()),
-          );
-        },
-      );
+      nextScreen = const LoginScreen();
     }
 
-    Navigator.pushReplacement(
-      context,
+    Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 400),
         pageBuilder: (_, __, ___) => nextScreen,

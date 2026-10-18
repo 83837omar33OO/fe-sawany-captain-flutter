@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/colors.dart';
+import '../../shell/main_shell.dart';
 import '../data/auth_repository.dart';
 
 class LoginScreen extends StatefulWidget {
-  final VoidCallback onLoginSuccess;
+  final VoidCallback? onLoginSuccess;
 
-  const LoginScreen({super.key, required this.onLoginSuccess});
+  const LoginScreen({super.key, this.onLoginSuccess});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -17,14 +18,22 @@ class _LoginScreenState extends State<LoginScreen> {
   final _authRepo = AuthRepository();
 
   bool _isLoading = false;
+  bool _obscurePassword = true;
   String? _errorMessage;
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   Future<void> _handleLogin() async {
     final phone = _phoneController.text.trim();
     final pass = _passwordController.text.trim();
 
     if (phone.isEmpty || pass.isEmpty) {
-      setState(() => _errorMessage = "يرجى إدخال رقم الهاتف وكلمة المرور");
+      setState(() => _errorMessage = "يرجى كتابة رقم الهاتف وكلمة المرور.");
       return;
     }
 
@@ -35,12 +44,25 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await _authRepo.login(phone, pass);
-      widget.onLoginSuccess();
+
+      if (!mounted) return;
+
+      if (widget.onLoginSuccess != null) {
+        widget.onLoginSuccess!();
+      }
+
+      // Always safely navigate using own active context
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const MainShell()),
+        (route) => false,
+      );
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll("Exception:", "").trim();
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -95,27 +117,35 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         if (_errorMessage != null) ...[
                           Container(
-                            padding: const EdgeInsets.all(10),
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: const Color(0xFF450A0A),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.danger.withOpacity(0.4)),
+                              border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.5)),
                             ),
-                            child: Text(
-                              _errorMessage!,
-                              style: const TextStyle(
-                                color: Color(0xFFFCA5A5),
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline, color: Color(0xFFFCA5A5), size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _errorMessage!,
+                                    style: const TextStyle(
+                                      color: Color(0xFFFCA5A5),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 16),
                         ],
 
                         const Text(
                           "رقم الهاتف",
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFCBD5E1)),
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFCBD5E1)),
                         ),
                         const SizedBox(height: 6),
                         TextField(
@@ -123,47 +153,99 @@ class _LoginScreenState extends State<LoginScreen> {
                           keyboardType: TextInputType.phone,
                           textDirection: TextDirection.ltr,
                           textAlign: TextAlign.right,
-                          style: const TextStyle(fontSize: 13, color: Colors.white),
-                          decoration: const InputDecoration(
+                          cursorColor: AppColors.primaryMint,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: const Color(0xFF0F172A),
                             hintText: "أدخل رقم الهاتف المسجل...",
-                            hintStyle: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                            prefixIcon: Icon(Icons.phone_iphone, size: 18, color: Color(0xFF94A3B8)),
+                            hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                            prefixIcon: const Icon(Icons.phone_iphone, size: 18, color: AppColors.primaryMint),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: Color(0xFF334155), width: 1),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: Color(0xFF334155), width: 1),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: AppColors.primaryMint, width: 1.5),
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 16),
 
                         const Text(
                           "كلمة المرور / الكود السري",
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFCBD5E1)),
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFCBD5E1)),
                         ),
                         const SizedBox(height: 6),
                         TextField(
                           controller: _passwordController,
-                          obscureText: true,
+                          obscureText: _obscurePassword,
                           textDirection: TextDirection.ltr,
                           textAlign: TextAlign.right,
-                          style: const TextStyle(fontSize: 13, color: Colors.white),
-                          decoration: const InputDecoration(
+                          cursorColor: AppColors.primaryMint,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: const Color(0xFF0F172A),
                             hintText: "أدخل كلمة المرور...",
-                            hintStyle: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                            prefixIcon: Icon(Icons.lock_outline, size: 18, color: Color(0xFF94A3B8)),
+                            hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                            prefixIcon: const Icon(Icons.lock_outline, size: 18, color: AppColors.primaryMint),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                size: 18,
+                                color: const Color(0xFF94A3B8),
+                              ),
+                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: Color(0xFF334155), width: 1),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: Color(0xFF334155), width: 1),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: AppColors.primaryMint, width: 1.5),
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 22),
 
                         ElevatedButton(
                           onPressed: _isLoading ? null : _handleLogin,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primaryMint,
                             foregroundColor: const Color(0xFF0F172A),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                           child: _isLoading
                               ? const SizedBox(
                                   height: 20,
                                   width: 20,
                                   child: CircularProgressIndicator(
-                                    strokeWidth: 2,
+                                    strokeWidth: 2.2,
                                     color: Color(0xFF0F172A),
                                   ),
                                 )

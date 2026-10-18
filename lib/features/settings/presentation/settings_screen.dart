@@ -2,18 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/storage/secure_storage_service.dart';
+import '../../../core/theme/theme_controller.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/presentation/login_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
-  final Function(ThemeMode mode) onThemeChanged;
-  final ThemeMode currentTheme;
-
-  const SettingsScreen({
-    super.key,
-    required this.onThemeChanged,
-    required this.currentTheme,
-  });
+  const SettingsScreen({super.key});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -64,12 +58,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (confirmed == true) {
       await _authRepo.logout();
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => LoginScreen(
-              onLoginSuccess: () {},
-            ),
-          ),
+        Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
         );
       }
     }
@@ -77,7 +68,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.currentTheme == ThemeMode.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -128,15 +119,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: AppColors.primaryLight,
+                              color: isDark ? const Color(0xFF064E3B) : AppColors.primaryLight,
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               _profile["zone"] ?? "الناصرية القديمة",
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: AppColors.primary,
+                                color: isDark ? AppColors.primaryMint : AppColors.primary,
                               ),
                             ),
                           ),
@@ -173,17 +164,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 SwitchListTile(
                   title: const Text("مظهر التطبيق الليلي (Dark Mode)", style: TextStyle(fontSize: 13)),
                   subtitle: const Text("توفير شحن البطارية وراحة العين أثناء القيادة الليلية", style: TextStyle(fontSize: 11)),
-                  secondary: Icon(isDark ? Icons.dark_mode : Icons.light_mode, color: AppColors.primary),
+                  secondary: Icon(isDark ? Icons.dark_mode : Icons.light_mode, color: AppColors.primaryMint),
                   value: isDark,
                   onChanged: (val) {
-                    widget.onThemeChanged(val ? ThemeMode.dark : ThemeMode.light);
+                    ThemeController.instance.setTheme(val ? ThemeMode.dark : ThemeMode.light);
                   },
                 ),
                 const Divider(height: 1),
                 SwitchListTile(
                   title: const Text("نغمات تنبيه واهتزاز الأوردرات", style: TextStyle(fontSize: 13)),
                   subtitle: const Text("رنين قوي واهتزاز متقطع لتنبيهك أثناء سير الموتوسيكل", style: TextStyle(fontSize: 11)),
-                  secondary: const Icon(Icons.volume_up_outlined, color: AppColors.primary),
+                  secondary: const Icon(Icons.volume_up_outlined, color: AppColors.primaryMint),
                   value: _soundEnabled,
                   onChanged: (val) => setState(() => _soundEnabled = val),
                 ),
@@ -208,7 +199,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.support_agent, color: AppColors.primary),
+                  leading: const Icon(Icons.support_agent, color: AppColors.primaryMint),
                   title: const Text("الاتصال بمشرف العمليات الميدانية", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   subtitle: const Text("01034293703 - لحل أي مشكلة في الاستلام أو التسليم", style: TextStyle(fontSize: 11)),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 14),
@@ -245,7 +236,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               'assets/images/tayyar-logo.png',
               width: 110,
               errorBuilder: (_, __, ___) => const Text(
-                "الطيار في ثواني v1.0.2",
+                "الطيار في ثواني v1.0.9",
                 style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
               ),
             ),
