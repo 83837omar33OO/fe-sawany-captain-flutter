@@ -26,6 +26,10 @@ dependencies:
   flutter_foreground_task: ^8.17.0
   url_launcher: ^6.3.0
 
+  # Interactive Map (OpenStreetMap - Al Ameriya / Damanhour)
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
   # Utilities & UI
   intl: ^0.19.0
 

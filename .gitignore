@@ -38,3 +38,4 @@ migrate_working_dir/
 
 # Release APKs built by actions
 release-apks/
+release-ready/
