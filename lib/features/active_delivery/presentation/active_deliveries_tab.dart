@@ -104,7 +104,6 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab> {
     showDialog(
       context: context,
       builder: (_) => DeliveryExceptionDialog(
-        orderId: orderId,
         onSubmit: (reason, notes) async {
           setState(() => _isActionLoading = true);
           try {
