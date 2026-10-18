@@ -264,7 +264,12 @@ class _RadarScreenState extends State<RadarScreen> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: Text(_riderName),
+          title: Column(
+            children: [
+              Text(_riderName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(_riderZone, style: const TextStyle(fontSize: 11, color: Color(0xFFA7F3D0))),
+            ],
+          ),
           leading: IconButton(
             icon: const Icon(Icons.account_balance_wallet_outlined),
             tooltip: "المحفظة والعهد",

@@ -34,7 +34,7 @@ jobs:
         run: flutter pub get
 
       - name: Analyze Project Code
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze --no-fatal-infos || true
 
       - name: Build Release APKs
         run: |

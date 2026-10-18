@@ -2,7 +2,6 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
 
 class AudioAlertService {
-  static final AudioPlayer _player = AudioPlayer();
 
   static Future<void> triggerNewOrderAlert() async {
     try {

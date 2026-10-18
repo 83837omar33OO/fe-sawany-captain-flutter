@@ -10,7 +10,6 @@ class AppTheme {
         primary: AppColors.primaryDark,
         secondary: AppColors.primaryMint,
         surface: AppColors.card,
-        background: AppColors.background,
       ),
       scaffoldBackgroundColor: AppColors.background,
       appBarTheme: const AppBarTheme(
