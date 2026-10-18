@@ -35,4 +35,8 @@ class ActiveOrderRepository {
       "note": details,
     });
   }
+
+  Future<void> reportDeliveryIssue(String orderId, String reason, String details) async {
+    return reportException(orderId, reason, details);
+  }
 }
