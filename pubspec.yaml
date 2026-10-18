@@ -39,3 +39,7 @@ flutter:
   assets:
     - assets/audio/
     - assets/images/
+
+dependency_overrides:
+  geolocator_android: 4.6.1
+

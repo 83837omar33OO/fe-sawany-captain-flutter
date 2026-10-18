@@ -5,41 +5,10 @@ allprojects {
     }
 }
 
-rootProject.ext {
-    compileSdkVersion = 35
-    targetSdkVersion = 35
-    minSdkVersion = 23
-}
-
 rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
-subprojects { project ->
-    project.ext {
-        compileSdkVersion = 35
-        targetSdkVersion = 35
-        minSdkVersion = 23
-    }
-    def configureAndroid = {
-        if (project.hasProperty("android")) {
-            project.android {
-                compileSdkVersion 35
-                defaultConfig {
-                    targetSdkVersion 35
-                }
-            }
-        }
-    }
-    if (project.state.executed) {
-        configureAndroid()
-    } else {
-        project.afterEvaluate {
-            configureAndroid()
-        }
-    }
-}
-
 subprojects {
     project.evaluationDependsOn(":app")
 }
