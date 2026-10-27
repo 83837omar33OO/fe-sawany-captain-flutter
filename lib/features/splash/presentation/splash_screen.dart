@@ -4,6 +4,7 @@ import '../../../core/storage/secure_storage_service.dart';
 import '../../permissions/presentation/permissions_screen.dart';
 import '../../auth/presentation/login_screen.dart';
 import '../../shell/main_shell.dart';
+import '../../fleet_manager/presentation/fleet_manager_dashboard.dart';
 import 'package:geolocator/geolocator.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -50,9 +51,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     final hasLocationPermission =
         perm == LocationPermission.always || perm == LocationPermission.whileInUse;
 
-    // Check session token
+    // Check session token & saved role
     final token = await SecureStorageService.getToken();
     final isAuthenticated = token != null && token.isNotEmpty;
+    final role = await SecureStorageService.getRiderRole();
 
     if (!mounted) return;
 
@@ -60,7 +62,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (!hasLocationPermission) {
       nextScreen = const PermissionsScreen();
     } else if (isAuthenticated) {
-      nextScreen = const MainShell();
+      nextScreen = role == "fleet_manager"
+          ? const FleetManagerDashboard()
+          : const MainShell();
     } else {
       nextScreen = const LoginScreen();
     }
@@ -78,7 +82,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.primaryDark,
+      backgroundColor: const Color(0xFF0F172A),
       body: Center(
         child: FadeTransition(
           opacity: _fadeAnim,
@@ -87,46 +91,46 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             children: [
               Image.asset(
                 'assets/images/tayyar-logo.png',
-                width: 170,
-                fit: BoxFit.contain,
+                width: 160,
                 errorBuilder: (_, __, ___) => Container(
-                  width: 90,
-                  height: 90,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
+                  padding: const EdgeInsets.all(20),
+                  decoration: const BoxDecoration(
+                    color: AppColors.primaryMint,
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.primaryMint, width: 2),
                   ),
-                  child: const Center(
-                    child: Text("🛵", style: TextStyle(fontSize: 44)),
+                  child: const Icon(
+                    Icons.delivery_dining,
+                    size: 60,
+                    color: Color(0xFF0F172A),
                   ),
                 ),
               ),
               const SizedBox(height: 24),
-              const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.2,
-                  color: AppColors.primaryMint,
-                ),
-              ),
-              const SizedBox(height: 16),
               const Text(
-                "الطيار في ثواني",
+                "في ثواني كابتن",
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 22,
+                  fontWeight: FontWeight.black,
                   color: Colors.white,
                   letterSpacing: 0.5,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 8),
               const Text(
-                "نظام تشغيل الكباتن والأسطول الميداني",
+                "منظومة التوصيل السريع وإدارة الأسطول",
                 style: TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFFA7F3D0),
+                  fontSize: 12,
+                  color: Color(0xFF94A3B8),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 36),
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: AppColors.primaryMint,
                 ),
               ),
             ],

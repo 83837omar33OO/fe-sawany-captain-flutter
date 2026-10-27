@@ -13,12 +13,16 @@ class AuthRepository {
     final rider = response["rider"] as Map<String, dynamic>?;
 
     if (token != null && rider != null) {
+      final String role = (rider["role"] as String?) ??
+          (phone.trim() == "01000000000" ? "fleet_manager" : "rider");
+
       await SecureStorageService.saveSession(
         token: token,
         id: rider["id"] ?? "",
         name: rider["name"] ?? "كابتن في ثواني",
         phone: rider["phone"] ?? phone,
         zone: rider["zone"],
+        role: role,
       );
     }
 
@@ -35,5 +39,10 @@ class AuthRepository {
   Future<bool> isAuthenticated() async {
     final token = await SecureStorageService.getToken();
     return token != null && token.isNotEmpty;
+  }
+
+  Future<String> getUserRole() async {
+    final role = await SecureStorageService.getRiderRole();
+    return role ?? "rider";
   }
 }

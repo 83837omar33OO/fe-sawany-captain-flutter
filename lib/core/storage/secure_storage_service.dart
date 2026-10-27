@@ -8,6 +8,7 @@ class SecureStorageService {
   static const String _keyRiderName = "captain_rider_name";
   static const String _keyRiderPhone = "captain_rider_phone";
   static const String _keyRiderZone = "captain_rider_zone";
+  static const String _keyRiderRole = "captain_rider_role";
 
   static Future<void> saveSession({
     required String token,
@@ -15,6 +16,7 @@ class SecureStorageService {
     required String name,
     required String phone,
     String? zone,
+    String? role,
   }) async {
     try {
       await _storage.write(key: _keyToken, value: token);
@@ -22,6 +24,7 @@ class SecureStorageService {
       await _storage.write(key: _keyRiderName, value: name);
       await _storage.write(key: _keyRiderPhone, value: phone);
       if (zone != null) await _storage.write(key: _keyRiderZone, value: zone);
+      if (role != null) await _storage.write(key: _keyRiderRole, value: role);
     } catch (_) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keyToken, token);
@@ -29,6 +32,7 @@ class SecureStorageService {
       await prefs.setString(_keyRiderName, name);
       await prefs.setString(_keyRiderPhone, phone);
       if (zone != null) await prefs.setString(_keyRiderZone, zone);
+      if (role != null) await prefs.setString(_keyRiderRole, role);
     }
   }
 
@@ -41,6 +45,15 @@ class SecureStorageService {
     }
   }
 
+  static Future<String?> getRiderRole() async {
+    try {
+      return await _storage.read(key: _keyRiderRole);
+    } catch (_) {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_keyRiderRole);
+    }
+  }
+
   static Future<Map<String, String?>> getRiderProfile() async {
     try {
       return {
@@ -48,6 +61,7 @@ class SecureStorageService {
         "name": await _storage.read(key: _keyRiderName),
         "phone": await _storage.read(key: _keyRiderPhone),
         "zone": await _storage.read(key: _keyRiderZone),
+        "role": await _storage.read(key: _keyRiderRole),
       };
     } catch (_) {
       final prefs = await SharedPreferences.getInstance();
@@ -56,6 +70,7 @@ class SecureStorageService {
         "name": prefs.getString(_keyRiderName),
         "phone": prefs.getString(_keyRiderPhone),
         "zone": prefs.getString(_keyRiderZone),
+        "role": prefs.getString(_keyRiderRole),
       };
     }
   }

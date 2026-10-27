@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/colors.dart';
 import '../../shell/main_shell.dart';
+import '../../fleet_manager/presentation/fleet_manager_dashboard.dart';
 import '../data/auth_repository.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -43,7 +44,10 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await _authRepo.login(phone, pass);
+      final res = await _authRepo.login(phone, pass);
+      final rider = res["rider"] as Map<String, dynamic>?;
+      final role = (rider?["role"] as String?) ??
+          (phone == "01000000000" ? "fleet_manager" : "rider");
 
       if (!mounted) return;
 
@@ -51,9 +55,13 @@ class _LoginScreenState extends State<LoginScreen> {
         widget.onLoginSuccess!();
       }
 
-      // Always safely navigate using own active context
+      // Navigate based on Account Role: Fleet Manager vs Regular Rider
+      final Widget targetScreen = role == "fleet_manager"
+          ? const FleetManagerDashboard()
+          : const MainShell();
+
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const MainShell()),
+        MaterialPageRoute(builder: (_) => targetScreen),
         (route) => false,
       );
     } catch (e) {
@@ -64,6 +72,14 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     }
+  }
+
+  void _fillAccount(String phone, String pass) {
+    setState(() {
+      _phoneController.text = phone;
+      _passwordController.text = pass;
+      _errorMessage = null;
+    });
   }
 
   @override
@@ -81,36 +97,44 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   Image.asset(
                     'assets/images/tayyar-logo.png',
-                    width: 150,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.delivery_dining,
-                      size: 54,
-                      color: AppColors.primaryMint,
+                    width: 140,
+                    errorBuilder: (_, __, ___) => Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: const BoxDecoration(
+                        color: AppColors.primaryMint,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.delivery_dining,
+                        size: 48,
+                        color: Color(0xFF0F172A),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
                   const Text(
-                    "بوابة دخول الكباتن",
+                    "بوابة أسطول في ثواني",
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      fontWeight: FontWeight.black,
                       color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    "سجّل دخولك لبدء استلام وتوصيل الطلبات",
+                    "دخول الكباتن ومسؤولي إدارة الأسطول",
                     style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // Login Box
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(18),
                       border: Border.all(color: const Color(0xFF334155)),
+                      boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 10)],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -120,7 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: const Color(0xFF450A0A),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(10),
                               border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.5)),
                             ),
                             child: Row(
@@ -144,8 +168,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         ],
 
                         const Text(
-                          "رقم الهاتف",
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFCBD5E1)),
+                          "رقم الهاتف المسجل",
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFCBD5E1)),
                         ),
                         const SizedBox(height: 6),
                         TextField(
@@ -162,7 +186,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: InputDecoration(
                             filled: true,
                             fillColor: const Color(0xFF0F172A),
-                            hintText: "أدخل رقم الهاتف المسجل...",
+                            hintText: "010XXXXXXXX",
                             hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                             prefixIcon: const Icon(Icons.phone_iphone, size: 18, color: AppColors.primaryMint),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -180,11 +204,11 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 14),
 
                         const Text(
-                          "كلمة المرور / الكود السري",
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFCBD5E1)),
+                          "كلمة المرور أو الكود السري",
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFCBD5E1)),
                         ),
                         const SizedBox(height: 6),
                         TextField(
@@ -201,7 +225,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: InputDecoration(
                             filled: true,
                             fillColor: const Color(0xFF0F172A),
-                            hintText: "أدخل كلمة المرور...",
+                            hintText: "••••••••",
                             hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                             prefixIcon: const Icon(Icons.lock_outline, size: 18, color: AppColors.primaryMint),
                             suffixIcon: IconButton(
@@ -227,7 +251,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 22),
+                        const SizedBox(height: 20),
 
                         ElevatedButton(
                           onPressed: _isLoading ? null : _handleLogin,
@@ -237,7 +261,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             elevation: 0,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           child: _isLoading
@@ -250,15 +274,56 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 )
                               : const Text(
-                                  "دخول وبدء الوردية",
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                  "دخول للمنصة",
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.black),
                                 ),
+                        ),
+
+                        const SizedBox(height: 16),
+                        const Divider(color: Color(0xFF334155)),
+                        const SizedBox(height: 8),
+
+                        // Quick Account Switcher for Demo / Testing
+                        const Text(
+                          "أو اختر حساباً تجريبياً سريعاً:",
+                          style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(color: Color(0xFF38BDF8)),
+                                  foregroundColor: const Color(0xFF38BDF8),
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: () => _fillAccount("01034293703", "123456"),
+                                child: const Text("🛵 طيار عادي", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(color: Color(0xFFFBBF24)),
+                                  foregroundColor: const Color(0xFFFBBF24),
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: () => _fillAccount("01000000000", "123456"),
+                                child: const Text("👑 مدير الطيارين", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   const Text(
                     "للانضمام لأسطول طياري في ثواني، تواصل مع المشرف: 01034293703",
                     textAlign: TextAlign.center,

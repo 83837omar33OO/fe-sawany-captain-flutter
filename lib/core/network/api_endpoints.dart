@@ -1,5 +1,6 @@
 class ApiEndpoints {
-  static const String baseUrl = "https://tayyar.fe-sawany.online";
+  // Main Production Server
+  static const String baseUrl = "https://fe-sawany.vercel.app";
 
   // Auth
   static const String login = "$baseUrl/api/rider/auth/login";
@@ -8,4 +9,8 @@ class ApiEndpoints {
   // Orders
   static const String orders = "$baseUrl/api/rider/orders";
   static const String settlement = "$baseUrl/api/rider/settlement";
+
+  // Fleet Operations & Live GPS Tracking
+  static const String fleet = "$baseUrl/api/rider/fleet";
+  static const String location = "$baseUrl/api/rider/location";
 }
