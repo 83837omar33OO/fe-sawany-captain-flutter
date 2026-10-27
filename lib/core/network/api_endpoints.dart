@@ -8,6 +8,7 @@ class ApiEndpoints {
 
   // Orders
   static const String orders = "$baseUrl/api/rider/orders";
+  static const String updatePricing = "$baseUrl/api/rider/orders/update-pricing";
   static const String settlement = "$baseUrl/api/rider/settlement";
 
   // Fleet Operations & Live GPS Tracking

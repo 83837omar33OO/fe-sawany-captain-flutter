@@ -56,6 +56,154 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab> {
     }
   }
 
+  void _openUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _showUpdatePricingDialog(ActiveOrder order) async {
+    final Map<String, TextEditingController> controllers = {};
+    for (final item in order.items) {
+      final key = item.productId ?? item.productName;
+      controllers[key] = TextEditingController(
+        text: item.unitPrice > 0 ? item.unitPrice.toStringAsFixed(0) : "",
+      );
+    }
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: const [
+              Icon(Icons.price_change, color: Color(0xFFD97706), size: 26),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  "تسجيل أسعار الأصناف من المحل",
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "أدخل السعر الفعلي لكل صنف من فاتورة الصيدلية/المحل لحساب الإجمالي بدقة للعميل:",
+                    style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 12),
+                  ...order.items.map((item) {
+                    final key = item.productId ?? item.productName;
+                    final ctrl = controllers[key];
+                    if (ctrl == null) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.productName,
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                                if (item.customizationNote != null)
+                                  Text(
+                                    item.customizationNote!,
+                                    style: const TextStyle(fontSize: 10, color: Color(0xFFD97706)),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 90,
+                            child: TextField(
+                              controller: ctrl,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                suffixText: "ج.م",
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("إلغاء"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryMint,
+                foregroundColor: const Color(0xFF0F172A),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final List<Map<String, dynamic>> priceList = [];
+                controllers.forEach((key, controller) {
+                  final val = double.tryParse(controller.text.trim());
+                  if (val != null) {
+                    priceList.add({"productId": key, "unitPrice": val});
+                  }
+                });
+
+                if (priceList.isNotEmpty) {
+                  setState(() => _isActionLoading = true);
+                  try {
+                    await _activeRepo.updatePricing(order.id, priceList);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("تم تحديث أسعار الفاتورة بنجاح وتحديث حساب العميل!"),
+                          backgroundColor: AppColors.primaryMint,
+                        ),
+                      );
+                    }
+                    await _loadOrders();
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("تعذر حفظ الأسعار، تحقق من الاتصال."),
+                          backgroundColor: AppColors.danger,
+                        ),
+                      );
+                    }
+                  } finally {
+                    if (mounted) setState(() => _isActionLoading = false);
+                  }
+                }
+              },
+              child: const Text("حفظ الفاتورة وتحديث الحساب", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _openNavigation({double? lat, double? lng, required String addressQuery}) async {
     Uri uri;
     if (lat != null && lng != null && lat != 0 && lng != 0) {
@@ -69,6 +217,154 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab> {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
+
+  void _openUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _showUpdatePricingDialog(ActiveOrder order) async {
+    final Map<String, TextEditingController> controllers = {};
+    for (final item in order.items) {
+      final key = item.productId ?? item.productName;
+      controllers[key] = TextEditingController(
+        text: item.unitPrice > 0 ? item.unitPrice.toStringAsFixed(0) : "",
+      );
+    }
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: const [
+              Icon(Icons.price_change, color: Color(0xFFD97706), size: 26),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  "تسجيل أسعار الأصناف من المحل",
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "أدخل السعر الفعلي لكل صنف من فاتورة الصيدلية/المحل لحساب الإجمالي بدقة للعميل:",
+                    style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 12),
+                  ...order.items.map((item) {
+                    final key = item.productId ?? item.productName;
+                    final ctrl = controllers[key];
+                    if (ctrl == null) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.productName,
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                                if (item.customizationNote != null)
+                                  Text(
+                                    item.customizationNote!,
+                                    style: const TextStyle(fontSize: 10, color: Color(0xFFD97706)),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 90,
+                            child: TextField(
+                              controller: ctrl,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                suffixText: "ج.م",
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("إلغاء"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryMint,
+                foregroundColor: const Color(0xFF0F172A),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final List<Map<String, dynamic>> priceList = [];
+                controllers.forEach((key, controller) {
+                  final val = double.tryParse(controller.text.trim());
+                  if (val != null) {
+                    priceList.add({"productId": key, "unitPrice": val});
+                  }
+                });
+
+                if (priceList.isNotEmpty) {
+                  setState(() => _isActionLoading = true);
+                  try {
+                    await _activeRepo.updatePricing(order.id, priceList);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("تم تحديث أسعار الفاتورة بنجاح وتحديث حساب العميل!"),
+                          backgroundColor: AppColors.primaryMint,
+                        ),
+                      );
+                    }
+                    await _loadOrders();
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("تعذر حفظ الأسعار، تحقق من الاتصال."),
+                          backgroundColor: AppColors.danger,
+                        ),
+                      );
+                    }
+                  } finally {
+                    if (mounted) setState(() => _isActionLoading = false);
+                  }
+                }
+              },
+              child: const Text("حفظ الفاتورة وتحديث الحساب", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _handlePickup(String orderId) async {
@@ -570,6 +866,127 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab> {
                     ],
                   ),
                 ),
+
+                // 3b. Prescription Details Card (Pharmacy Orders)
+                if (ord.prescriptionImageUrl != null || ord.prescriptionAudioUrl != null || ord.prescriptionNotes != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFA7F3D0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.medication, size: 20, color: Color(0xFF059669)),
+                            SizedBox(width: 8),
+                            Text(
+                              "💊 روشتة علاج ومستلزمات صيدلية مرفقة",
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF065F46)),
+                            ),
+                          ],
+                        ),
+                        if (ord.prescriptionNotes != null && ord.prescriptionNotes!.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            "ملاحظات الأدوية: ${ord.prescriptionNotes}",
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF047857), fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            if (ord.prescriptionImageUrl != null)
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF065F46),
+                                    side: const BorderSide(color: Color(0xFF059669)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                  ),
+                                  icon: const Icon(Icons.image, size: 16),
+                                  label: const Text("عرض صورة الروشتة", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                  onPressed: () => _openUrl(ord.prescriptionImageUrl!),
+                                ),
+                              ),
+                            if (ord.prescriptionImageUrl != null && ord.prescriptionAudioUrl != null)
+                              const SizedBox(width: 8),
+                            if (ord.prescriptionAudioUrl != null)
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF059669),
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                  ),
+                                  icon: const Icon(Icons.mic, size: 16),
+                                  label: const Text("استماع للريكورد", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                  onPressed: () => _openUrl(ord.prescriptionAudioUrl!),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // 3c. Variable / Market Price Entry Card
+                if (ord.hasUnpricedItems || ord.items.any((it) => it.isMarketPrice || it.unitPrice == 0.0)) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "⚠️ أوردر به أصناف متغيرة السعر أو بالوزن / روشتة",
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          "يجب تسجيل السعر الفعلي من المحل لتحديث الفاتورة للعميل:",
+                          style: TextStyle(fontSize: 11, color: Color(0xFF78350F)),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFD97706),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                ),
+                                icon: const Icon(Icons.edit_note, size: 18),
+                                label: const Text("تسجيل وتعديل الأسعار من المحل", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                onPressed: () => _showUpdatePricingDialog(ord),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.phone_in_talk, color: Color(0xFFD97706)),
+                              tooltip: "الاتصال بالعميل لإبلاغه بالتكلفة",
+                              onPressed: () => _dialPhone(ord.customerPhone),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
                 const SizedBox(height: 14),
 

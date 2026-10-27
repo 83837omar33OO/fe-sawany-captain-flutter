@@ -39,4 +39,11 @@ class ActiveOrderRepository {
   Future<void> reportDeliveryIssue(String orderId, String reason, String details) async {
     return reportException(orderId, reason, details);
   }
+
+  Future<void> updatePricing(String orderId, List<Map<String, dynamic>> itemPrices) async {
+    await ApiClient.post(ApiEndpoints.updatePricing, {
+      "orderId": orderId,
+      "itemPrices": itemPrices,
+    });
+  }
 }
