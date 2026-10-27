@@ -126,7 +126,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab> {
                     const Text("المبلغ المطلوب تحصيله كاش:", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                     Text(
                       "${order.totalCashToCollect.toStringAsFixed(0)} ج.م",
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.black, color: Color(0xFF047857)),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF047857)),
                     ),
                   ],
                 ),
@@ -318,7 +318,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab> {
                   "طلب #${ord.orderReference}",
                   style: const TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.black,
+                    fontWeight: FontWeight.w900,
                     fontFamily: 'monospace',
                     color: Color(0xFF475569),
                   ),
@@ -590,7 +590,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab> {
                           const Text("صافي عمولتك:", style: TextStyle(fontSize: 11, color: Color(0xFF9A3412))),
                           Text(
                             "+${ord.riderEarning.toStringAsFixed(0)} ج.م",
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.black, color: Color(0xFF059669)),
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF059669)),
                           ),
                         ],
                       ),
@@ -600,7 +600,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab> {
                           const Text("المطلوب تحصيله كاش:", style: TextStyle(fontSize: 11, color: Color(0xFF9A3412))),
                           Text(
                             "${ord.totalCashToCollect.toStringAsFixed(0)} ج.م",
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.black, color: Color(0xFFEA580C)),
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFFEA580C)),
                           ),
                         ],
                       ),

@@ -116,7 +116,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     "بوابة أسطول في ثواني",
                     style: TextStyle(
                       fontSize: 20,
-                      fontWeight: FontWeight.black,
+                      fontWeight: FontWeight.w900,
                       color: Colors.white,
                     ),
                   ),
@@ -275,7 +275,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 )
                               : const Text(
                                   "دخول للمنصة",
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.black),
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
                                 ),
                         ),
 

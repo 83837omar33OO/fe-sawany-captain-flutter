@@ -395,7 +395,7 @@ class _FleetManagerDashboardState extends State<FleetManagerDashboard> with Sing
       ),
       child: Row(
         children: [
-          Text(value, style: TextStyle(color: color, fontWeight: FontWeight.black, fontSize: 12)),
+          Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12)),
           const SizedBox(width: 4),
           Text(label, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
         ],

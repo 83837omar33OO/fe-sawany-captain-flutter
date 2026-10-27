@@ -110,7 +110,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 "في ثواني كابتن",
                 style: TextStyle(
                   fontSize: 22,
-                  fontWeight: FontWeight.black,
+                  fontWeight: FontWeight.w900,
                   color: Colors.white,
                   letterSpacing: 0.5,
                 ),
