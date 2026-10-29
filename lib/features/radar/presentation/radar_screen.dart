@@ -219,7 +219,7 @@ class _RadarScreenState extends State<RadarScreen> {
   }
 
   void _handleOpenMaps(String query) async {
-    final encoded = Uri.encodeComponent("$query, مركز دمنهور, البحيرة");
+    final encoded = Uri.encodeComponent("$query, الناصرية القديمة, الإسكندرية");
     final uri = Uri.parse("https://www.google.com/maps/search/?api=1&query=$encoded");
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);

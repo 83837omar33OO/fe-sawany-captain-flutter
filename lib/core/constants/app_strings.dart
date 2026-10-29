@@ -1,6 +1,6 @@
 class AppStrings {
   static const String appName = "كابتن في ثواني";
-  static const String appTagline = "أسطول التوصيل الذكي - دمنهور والبحيرة";
+  static const String appTagline = "أسطول التوصيل السريع - الناصرية وغرب الإسكندرية";
   static const String defaultZone = "منطقة الناصرية القديمة وجميع القطاعات";
 
   // Duty

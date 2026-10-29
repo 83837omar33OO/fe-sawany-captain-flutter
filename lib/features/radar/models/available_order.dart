@@ -11,10 +11,16 @@ class AvailableOrder {
   final String deliveryArea;
   final String customerAddress;
   final String? customerNotes;
+  final String? customerName;
+  final String? customerPhone;
   final double? customerLat;
   final double? customerLng;
   final double orderValue;
   final double deliveryEarning;
+  final double subtotal;
+  final double serviceFee;
+  final double discount;
+  final double totalToCollect;
   final List<OrderItemInfo> items;
   final int totalPiecesCount;
   final DateTime createdAt;
@@ -30,10 +36,16 @@ class AvailableOrder {
     required this.deliveryArea,
     required this.customerAddress,
     this.customerNotes,
+    this.customerName,
+    this.customerPhone,
     this.customerLat,
     this.customerLng,
     required this.orderValue,
     required this.deliveryEarning,
+    required this.subtotal,
+    required this.serviceFee,
+    required this.discount,
+    required this.totalToCollect,
     required this.items,
     required this.totalPiecesCount,
     required this.createdAt,
@@ -54,8 +66,9 @@ class AvailableOrder {
     final addressDesc = customer?["addressDescription"] ??
         customer?["streetLandmark"] ??
         customer?["addressText"] ??
+        json["addressDescription"] ??
         "المنطقة";
-    final landmark = customer?["nearbyLandmark"] as String?;
+    final landmark = customer?["nearbyLandmark"] as String? ?? json["nearbyLandmark"] as String?;
     final fullCustomerAddress = (landmark != null && landmark.isNotEmpty)
         ? "$addressDesc - $landmark"
         : addressDesc;
@@ -69,6 +82,20 @@ class AvailableOrder {
     final sLat = (storeDetails?["latitude"] as num?)?.toDouble();
     final sLng = (storeDetails?["longitude"] as num?)?.toDouble();
 
+    final totalPayable = (pricing?["totalPayable"] as num?)?.toDouble() ??
+        (json["cashToCollect"] as num?)?.toDouble() ??
+        0.0;
+    final deliveryFee = (json["deliveryEarning"] as num?)?.toDouble() ??
+        (pricing?["deliveryFee"] as num?)?.toDouble() ??
+        15.0;
+    final sub = (pricing?["subtotal"] as num?)?.toDouble() ??
+        (totalPayable > deliveryFee ? (totalPayable - deliveryFee) : totalPayable);
+    final service = (pricing?["serviceFee"] as num?)?.toDouble() ?? 0.0;
+    final disc = (pricing?["discount"] as num?)?.toDouble() ?? 0.0;
+
+    final custName = customer?["name"] ?? json["customerName"] ?? "عميل في ثواني";
+    final custPhone = customer?["phone"] ?? json["customerPhone"] ?? "";
+
     return AvailableOrder(
       id: json["id"] ?? "",
       orderReference: json["orderReference"] ?? json["id"]?.toString().substring(0, 6),
@@ -77,17 +104,19 @@ class AvailableOrder {
       storePhone: storeDetails?["phone"],
       storeLat: sLat,
       storeLng: sLng,
-      deliveryArea: customer?["zoneNameArabic"] ?? "نطاق دمنهور / العامرية",
+      deliveryArea: customer?["zoneNameArabic"] ?? json["zoneNameArabic"] ?? "الناصرية القديمة / الإسكندرية",
       customerAddress: fullCustomerAddress,
-      customerNotes: customer?["notes"],
+      customerNotes: customer?["notes"] ?? json["notes"],
+      customerName: custName,
+      customerPhone: custPhone,
       customerLat: cLat,
       customerLng: cLng,
-      orderValue: (pricing?["totalPayable"] as num?)?.toDouble() ??
-          (json["cashToCollect"] as num?)?.toDouble() ??
-          0.0,
-      deliveryEarning: (json["deliveryEarning"] as num?)?.toDouble() ??
-          (pricing?["deliveryFee"] as num?)?.toDouble() ??
-          15.0,
+      orderValue: totalPayable,
+      deliveryEarning: deliveryFee,
+      subtotal: sub,
+      serviceFee: service,
+      discount: disc,
+      totalToCollect: totalPayable,
       items: itemsList,
       totalPiecesCount: totalPieces > 0 ? totalPieces : 1,
       createdAt: json["createdAt"] != null

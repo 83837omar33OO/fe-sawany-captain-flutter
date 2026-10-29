@@ -163,7 +163,7 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
     if (lat != null && lng != null && lat != 0 && lng != 0) {
       uri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving");
     } else {
-      final encoded = Uri.encodeComponent("$addressQuery, دمنهور, البحيرة, مصر");
+      final encoded = Uri.encodeComponent("$addressQuery, الناصرية القديمة, الإسكندرية, مصر");
       uri = Uri.parse("https://www.google.com/maps/search/?api=1&query=$encoded");
     }
     if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -296,7 +296,7 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
                           const Icon(Icons.location_on, size: 15, color: Color(0xFF10B981)),
                           const SizedBox(width: 5),
                           Text(
-                            "نطاق دمنهور • الناصرية",
+                            "نطاق الناصرية القديمة • غرب الإسكندرية",
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -502,9 +502,9 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
           const SizedBox(height: 6),
           Text(
             isOut
-                ? "تسليم لـ: ${ord.customerName} • ${ord.customerAddress}"
+                ? "تسليم لـ: ${ord.customerName} (${ord.customerPhone.isNotEmpty ? ord.customerPhone : 'الهاتف متاح بالداخل'}) • ${ord.customerAddress}"
                 : "استلام من: ${ord.storeName} (${ord.storeAddress})",
-            style: const TextStyle(fontSize: 11, color: Color(0xFF475569)),
+            style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -552,8 +552,8 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
               const SizedBox(width: 8),
               OutlinedButton(
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF0F172A),
-                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
+                  side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
@@ -596,7 +596,7 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF5),
+                  color: isDark ? const Color(0xFF064E3B).withOpacity(0.5) : const Color(0xFFECFDF5),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
@@ -604,7 +604,7 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF047857),
+                    color: Color(0xFF10B981),
                   ),
                 ),
               ),
@@ -613,7 +613,30 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
           const SizedBox(height: 4),
           Text(
             "المحل: ${ord.storeArea} • التسليم: ${ord.deliveryArea}",
-            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+            style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 6),
+          // Clear pricing breakdown preview
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "مشتريات: ${ord.subtotal.toStringAsFixed(0)} ج | خدمة: ${ord.serviceFee > 0 ? ord.serviceFee.toStringAsFixed(1) : '0'} ج",
+                  style: TextStyle(fontSize: 10, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B)),
+                ),
+                Text(
+                  "كاش للتحصيل: ${ord.totalToCollect.toStringAsFixed(0)} ج.م",
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 8),
           Row(
@@ -639,8 +662,8 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
               const SizedBox(width: 8),
               OutlinedButton(
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF64748B),
-                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  foregroundColor: isDark ? Colors.white : const Color(0xFF64748B),
+                  side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),

@@ -56,6 +56,9 @@ class ActiveOrder {
   final double? customerLng;
   final double totalCashToCollect;
   final double riderEarning;
+  final double subtotal;
+  final double serviceFee;
+  final double discount;
   final List<OrderItemInfo> items;
   final int totalPiecesCount;
   final String? paymentMethod;
@@ -80,6 +83,9 @@ class ActiveOrder {
     this.customerLng,
     required this.totalCashToCollect,
     required this.riderEarning,
+    required this.subtotal,
+    required this.serviceFee,
+    required this.discount,
     required this.items,
     required this.totalPiecesCount,
     this.paymentMethod,
@@ -122,6 +128,20 @@ class ActiveOrder {
         ? "$addressDesc - $landmark"
         : addressDesc;
 
+    final totalPayable = (pricing?["totalPayable"] as num?)?.toDouble() ??
+        (json["cashToCollect"] as num?)?.toDouble() ??
+        0.0;
+    final deliveryFee = (json["deliveryEarning"] as num?)?.toDouble() ??
+        (pricing?["deliveryFee"] as num?)?.toDouble() ??
+        15.0;
+    final sub = (pricing?["subtotal"] as num?)?.toDouble() ??
+        (totalPayable > deliveryFee ? (totalPayable - deliveryFee) : totalPayable);
+    final service = (pricing?["serviceFee"] as num?)?.toDouble() ?? 0.0;
+    final disc = (pricing?["discount"] as num?)?.toDouble() ?? 0.0;
+
+    final custName = customer?["name"] ?? json["customerName"] ?? "عميل في ثواني";
+    final custPhone = customer?["phone"] ?? json["customerPhone"] ?? "";
+
     return ActiveOrder(
       id: json["id"] ?? "",
       orderReference: json["orderReference"] ?? json["id"]?.toString().substring(0, 6),
@@ -129,18 +149,17 @@ class ActiveOrder {
       storeName: storeDetails?["nameArabic"] ?? json["storeNameArabic"] ?? "المحل الشريك",
       storeAddress: storeDetails?["addressText"] ?? "الناصرية القديمة",
       storePhone: storeDetails?["phone"],
-      customerName: customer?["name"] ?? "عميل في ثواني",
-      customerPhone: customer?["phone"] ?? "",
+      customerName: custName,
+      customerPhone: custPhone,
       customerAddress: fullCustomerAddress,
-      customerNotes: customer?["notes"],
+      customerNotes: customer?["notes"] ?? json["notes"],
       customerLat: lat,
       customerLng: lng,
-      totalCashToCollect: (pricing?["totalPayable"] as num?)?.toDouble() ??
-          (json["cashToCollect"] as num?)?.toDouble() ??
-          0.0,
-      riderEarning: (json["deliveryEarning"] as num?)?.toDouble() ??
-          (pricing?["deliveryFee"] as num?)?.toDouble() ??
-          15.0,
+      totalCashToCollect: totalPayable,
+      riderEarning: deliveryFee,
+      subtotal: sub,
+      serviceFee: service,
+      discount: disc,
       items: itemsList,
       totalPiecesCount: totalPieces > 0 ? totalPieces : 1,
       paymentMethod: json["paymentMethod"] ?? "cash_on_delivery",

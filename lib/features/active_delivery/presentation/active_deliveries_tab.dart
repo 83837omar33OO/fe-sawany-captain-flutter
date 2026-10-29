@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/colors.dart';
@@ -10,6 +11,7 @@ import '../data/active_order_repository.dart';
 import '../models/active_order.dart';
 import '../../radar/models/available_order.dart';
 import 'delivery_exception_dialog.dart';
+import 'order_completion_celebration_dialog.dart';
 
 class ActiveDeliveriesTab extends StatefulWidget {
   const ActiveDeliveriesTab({super.key});
@@ -159,7 +161,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
     if (lat != null && lng != null && lat != 0 && lng != 0) {
       uri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving");
     } else {
-      final encoded = Uri.encodeComponent("$addressQuery, دمنهور, البحيرة, مصر");
+      final encoded = Uri.encodeComponent("$addressQuery, الناصرية القديمة, الإسكندرية, مصر");
       uri = Uri.parse("https://www.google.com/maps/search/?api=1&query=$encoded");
     }
 
@@ -325,12 +327,14 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
         await _activeRepo.completeDelivery(order.id);
         AudioAlertService.triggerSuccessFeedback();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                "مبروك! تم إتمام الطلب وإضافة +${order.riderEarning.toStringAsFixed(0)} ج.م لمحفظتك 💰",
-              ),
-              backgroundColor: AppColors.primaryMint,
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => OrderCompletionCelebrationDialog(
+              order: order,
+              onDismiss: () {
+                _loadData();
+              },
             ),
           );
         }
@@ -358,20 +362,27 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
 
     final notesCtrl = TextEditingController();
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     await showDialog(
       context: context,
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
-            children: const [
-              Icon(Icons.receipt_long, color: Color(0xFFD97706), size: 26),
-              SizedBox(width: 8),
+            children: [
+              const Icon(Icons.receipt_long, color: Color(0xFFD97706), size: 26),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   "تسجيل أسعار الفاتورة الفعلية",
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : AppColors.slateDark,
+                  ),
                 ),
               ),
             ],
@@ -386,13 +397,13 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFFBEB),
+                      color: isDark ? const Color(0xFF78350F).withOpacity(0.3) : const Color(0xFFFFFBEB),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFFDE68A)),
+                      border: Border.all(color: isDark ? const Color(0xFFB45309) : const Color(0xFFFDE68A)),
                     ),
-                    child: const Text(
+                    child: Text(
                       "أدخل سعر كل صنف حسب فاتورة المحل. سيتم حفظ الحركة في سجل الرقابة وتحديث الإجمالي للعميل.",
-                      style: TextStyle(fontSize: 11, color: Color(0xFF92400E)),
+                      style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E)),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -410,11 +421,15 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                               children: [
                                 Text(
                                   item.productName,
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? Colors.white : AppColors.slateDark,
+                                  ),
                                 ),
                                 Text(
                                   "الكمية: ${item.quantity} • السعر الحالي: ${item.unitPrice} ج.م",
-                                  style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                                  style: TextStyle(fontSize: 10, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                                 ),
                               ],
                             ),
@@ -425,9 +440,11 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                             child: TextField(
                               controller: ctrl,
                               keyboardType: TextInputType.number,
+                              style: TextStyle(fontSize: 13, color: isDark ? Colors.white : AppColors.slateDark),
                               decoration: InputDecoration(
                                 suffixText: "ج.م",
                                 isDense: true,
+                                fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                               ),
@@ -440,10 +457,12 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                   const SizedBox(height: 8),
                   TextField(
                     controller: notesCtrl,
+                    style: TextStyle(fontSize: 12, color: isDark ? Colors.white : AppColors.slateDark),
                     decoration: InputDecoration(
                       labelText: "ملاحظة توضيحية لتعديل السعر (اختياري)",
-                      labelStyle: const TextStyle(fontSize: 11),
+                      labelStyle: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                       isDense: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
@@ -505,38 +524,48 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
   }
 
   void _showPriceChangeCallDialog(ActiveOrder order) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     showDialog(
       context: context,
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
-            children: const [
-              Icon(Icons.phone_forwarded, color: Color(0xFF0284C7), size: 26),
-              SizedBox(width: 8),
-              Text("تم تحديث أسعار الفاتورة", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            children: [
+              const Icon(Icons.phone_forwarded, color: Color(0xFF0284C7), size: 26),
+              const SizedBox(width: 8),
+              Text(
+                "تم تحديث أسعار الفاتورة",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: isDark ? Colors.white : AppColors.slateDark,
+                ),
+              ),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 "تم تسجيل تعديل الأسعار بالسيرفر وسجل الرقابة بنجاح.",
-                style: TextStyle(fontSize: 12, color: Color(0xFF0F172A)),
+                style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF0F172A)),
               ),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0F9FF),
+                  color: isDark ? const Color(0xFF0C4A6E).withOpacity(0.4) : const Color(0xFFF0F9FF),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFBAE6FD)),
+                  border: Border.all(color: isDark ? const Color(0xFF0284C7) : const Color(0xFFBAE6FD)),
                 ),
                 child: Text(
                   "يُوصى بالاتصال بالعميل (${order.customerName}) فوراً لإبلاغه بالقيمة المعدلة لتفادي أي التباس عند التسليم.",
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF0369A1)),
+                  style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0369A1)),
                 ),
               ),
             ],
@@ -544,7 +573,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text("لاحقاً"),
+              child: Text("لاحقاً", style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
             ),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
@@ -756,15 +785,43 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 "أنت متصل وجاهز للاستقبال فور ورود طلب جديد.",
-                style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                 textAlign: TextAlign.center,
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildPriceBreakdownRow({
+    required String label,
+    required String value,
+    required bool isDark,
+    Color? highlightColor,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: highlightColor ?? (isDark ? Colors.white : AppColors.slateDark),
+          ),
+        ),
+      ],
     );
   }
 
@@ -793,26 +850,39 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
           // Header Bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: const BoxDecoration(
-              color: Color(0xFFFFFBEB),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF78350F).withOpacity(0.35) : const Color(0xFFFFFBEB),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? const Color(0xFFB45309).withOpacity(0.4) : const Color(0xFFFDE68A),
+                ),
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.bolt, color: Color(0xFFD97706), size: 16),
+                    const Icon(Icons.bolt, color: Color(0xFFF59E0B), size: 16),
                     const SizedBox(width: 4),
-                    const Text(
+                    Text(
                       "عرض طلب جديد متاح",
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309),
+                      ),
                     ),
                   ],
                 ),
                 Text(
                   "طلب #${offer.orderReference}",
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF78350F)),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF78350F),
+                  ),
                 ),
               ],
             ),
@@ -826,24 +896,28 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                 // Store & Area Info
                 Row(
                   children: [
-                    const Icon(Icons.storefront, size: 18, color: Color(0xFFD97706)),
+                    const Icon(Icons.storefront, size: 18, color: Color(0xFFF59E0B)),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         offer.storeName,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: isDark ? Colors.white : AppColors.slateDark,
+                        ),
                       ),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFECFDF5),
+                        color: isDark ? const Color(0xFF064E3B).withOpacity(0.4) : const Color(0xFFECFDF5),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFA7F3D0)),
+                        border: Border.all(color: isDark ? const Color(0xFF047857) : const Color(0xFFA7F3D0)),
                       ),
                       child: Text(
                         "+${offer.deliveryEarning.toStringAsFixed(0)} ج.م أجر الكابتن",
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF047857)),
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
                       ),
                     ),
                   ],
@@ -851,8 +925,26 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                 const SizedBox(height: 6),
                 Text(
                   "من: ${offer.storeArea} ⬅️ إلى: ${offer.deliveryArea}",
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                  style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                 ),
+                if (offer.customerNotes != null && offer.customerNotes!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF78350F).withOpacity(0.25) : const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      "ملاحظة العميل: ${offer.customerNotes}",
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 10),
 
                 // Collapsible Items Breakdown
@@ -883,14 +975,18 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                             const SizedBox(width: 6),
                             Text(
                               "محتويات الطلب (${offer.items.length} أصناف • ${offer.totalPiecesCount} قطع)",
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : AppColors.slateDark,
+                              ),
                             ),
                           ],
                         ),
                         Icon(
                           isItemsExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                           size: 18,
-                          color: const Color(0xFF64748B),
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                         ),
                       ],
                     ),
@@ -916,12 +1012,16 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                               Expanded(
                                 child: Text(
                                   "${it.productName} (× ${it.quantity})",
-                                  style: const TextStyle(fontSize: 11),
+                                  style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppColors.slateDark),
                                 ),
                               ),
                               Text(
                                 it.unitPrice > 0 ? "${it.itemTotal.toStringAsFixed(0)} ج.م" : "سعر تقريبي",
-                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : AppColors.slateDark,
+                                ),
                               ),
                             ],
                           ),
@@ -931,15 +1031,101 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                   ),
                 ],
 
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "قيمة الطلب: ${offer.orderValue.toStringAsFixed(0)} ج.م",
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                const SizedBox(height: 10),
+
+                // Transparent Financial Breakdown Box (Before Acceptance)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                     ),
-                  ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "تفاصيل الحسابات والفاتورة:",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              "دفع كاش 💵",
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _buildPriceBreakdownRow(
+                        label: "قيمة مشتريات الأصناف من المحل:",
+                        value: "${offer.subtotal.toStringAsFixed(0)} ج.م",
+                        isDark: isDark,
+                      ),
+                      const SizedBox(height: 4),
+                      _buildPriceBreakdownRow(
+                        label: "أجر توصيل الكابتن (ربحك في المشوار):",
+                        value: "+${offer.deliveryEarning.toStringAsFixed(0)} ج.م",
+                        isDark: isDark,
+                        highlightColor: const Color(0xFF10B981),
+                      ),
+                      const SizedBox(height: 4),
+                      _buildPriceBreakdownRow(
+                        label: "رسوم الخدمة والتطبيق:",
+                        value: "${offer.serviceFee > 0 ? offer.serviceFee.toStringAsFixed(1) : '0'} ج.م",
+                        isDark: isDark,
+                      ),
+                      if (offer.discount > 0) ...[
+                        const SizedBox(height: 4),
+                        _buildPriceBreakdownRow(
+                          label: "خصم العرض الترويجي:",
+                          value: "-${offer.discount.toStringAsFixed(0)} ج.م",
+                          isDark: isDark,
+                          highlightColor: const Color(0xFFEF4444),
+                        ),
+                      ],
+                      Divider(height: 16, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "المطلوب تحصيله كاش من العميل:",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              color: isDark ? Colors.white : AppColors.slateDark,
+                            ),
+                          ),
+                          Text(
+                            "${offer.totalToCollect.toStringAsFixed(0)} ج.م",
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF10B981),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 12),
 
@@ -978,8 +1164,8 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                     const SizedBox(width: 8),
                     OutlinedButton(
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF64748B),
-                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        foregroundColor: isDark ? Colors.white : const Color(0xFF64748B),
+                        side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
@@ -1073,6 +1259,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                   icon: Icons.storefront,
                   iconColor: const Color(0xFFD97706),
                   isExpanded: isStoreExpanded,
+                  isDark: isDark,
                   onTap: () {
                     setState(() {
                       if (isStoreExpanded) {
@@ -1090,6 +1277,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1097,7 +1285,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                         Expanded(
                           child: Text(
                             ord.storeAddress,
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                            style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B)),
                           ),
                         ),
                         if (ord.storePhone != null && ord.storePhone!.isNotEmpty)
@@ -1124,6 +1312,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                   icon: Icons.person_pin_circle,
                   iconColor: const Color(0xFF0284C7),
                   isExpanded: isCustomerExpanded,
+                  isDark: isDark,
                   onTap: () {
                     setState(() {
                       if (isCustomerExpanded) {
@@ -1137,64 +1326,142 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                 if (isCustomerExpanded) ...[
                   const SizedBox(height: 6),
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        // Customer Phone Bar
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.phone_android, size: 16, color: Color(0xFF10B981)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    ord.customerPhone.isNotEmpty ? ord.customerPhone : "رقم الهاتف غير متاح",
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark ? Colors.white : AppColors.slateDark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (ord.customerPhone.isNotEmpty)
+                                InkWell(
+                                  onTap: () {
+                                    Clipboard.setData(ClipboardData(text: ord.customerPhone));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text("تم نسخ رقم هاتف العميل للحافظة 📋"),
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.copy, size: 14, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          "نسخ",
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
                         Text(
                           "العنوان: ${ord.customerAddress}",
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF475569)),
+                          style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
                         ),
                         if (ord.customerNotes != null && ord.customerNotes!.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            "ملاحظات: ${ord.customerNotes}",
-                            style: const TextStyle(fontSize: 11, color: Color(0xFFD97706), fontWeight: FontWeight.bold),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF78350F).withOpacity(0.3) : const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              "ملاحظة هامة من العميل: ${ord.customerNotes}",
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ],
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
+
+                        // Action Buttons (Equally distributed, zero overflow)
                         Row(
                           children: [
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF10B981),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF10B981),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: () => _dialPhone(ord.customerPhone),
+                                icon: const Icon(Icons.phone, size: 15),
+                                label: const Text("اتصال", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                               ),
-                              onPressed: () => _dialPhone(ord.customerPhone),
-                              icon: const Icon(Icons.phone, size: 16),
-                              label: const Text("اتصال", style: TextStyle(fontSize: 11)),
                             ),
-                            const SizedBox(width: 8),
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF25D366),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF25D366),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: () => _openWhatsApp(ord.customerPhone, ord.orderReference ?? ord.id),
+                                icon: const Icon(Icons.chat, size: 15),
+                                label: const Text("واتساب", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                               ),
-                              onPressed: () => _openWhatsApp(ord.customerPhone, ord.orderReference ?? ord.id),
-                              icon: const Icon(Icons.chat, size: 16),
-                              label: const Text("واتساب", style: TextStyle(fontSize: 11)),
                             ),
-                            const SizedBox(width: 8),
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
+                                  side: BorderSide(color: isDark ? const Color(0xFF0284C7) : const Color(0xFF38BDF8)),
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: () => _openNavigation(
+                                  lat: ord.customerLat,
+                                  lng: ord.customerLng,
+                                  addressQuery: ord.customerAddress,
+                                ),
+                                icon: const Icon(Icons.navigation, size: 15),
+                                label: const Text("ملاحة", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                               ),
-                              onPressed: () => _openNavigation(
-                                lat: ord.customerLat,
-                                lng: ord.customerLng,
-                                addressQuery: ord.customerAddress,
-                              ),
-                              icon: const Icon(Icons.navigation, size: 16),
-                              label: const Text("ملاحة", style: TextStyle(fontSize: 11)),
                             ),
                           ],
                         ),
@@ -1211,6 +1478,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                   icon: Icons.receipt_long,
                   iconColor: const Color(0xFF6366F1),
                   isExpanded: isItemsExpanded,
+                  isDark: isDark,
                   onTap: () {
                     setState(() {
                       if (isItemsExpanded) {
@@ -1228,6 +1496,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                     ),
                     child: Column(
                       children: [
@@ -1239,24 +1508,50 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                                   Expanded(
                                     child: Text(
                                       "${it.productName} (× ${it.quantity})",
-                                      style: const TextStyle(fontSize: 11),
+                                      style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppColors.slateDark),
                                     ),
                                   ),
                                   Text(
                                     it.unitPrice > 0 ? "${it.itemTotal.toStringAsFixed(0)} ج.م" : "سعر تقريبي",
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.slateDark),
                                   ),
                                 ],
                               ),
                             )),
-                        const Divider(),
+                        Divider(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        _buildPriceBreakdownRow(
+                          label: "قيمة مشتريات الأصناف:",
+                          value: "${ord.subtotal.toStringAsFixed(0)} ج.م",
+                          isDark: isDark,
+                        ),
+                        const SizedBox(height: 4),
+                        _buildPriceBreakdownRow(
+                          label: "أجر التوصيل لكابتن في ثواني:",
+                          value: "+${ord.riderEarning.toStringAsFixed(0)} ج.م",
+                          isDark: isDark,
+                          highlightColor: const Color(0xFF10B981),
+                        ),
+                        const SizedBox(height: 4),
+                        _buildPriceBreakdownRow(
+                          label: "رسوم الخدمة والتطبيق:",
+                          value: "${ord.serviceFee > 0 ? ord.serviceFee.toStringAsFixed(1) : '0'} ج.م",
+                          isDark: isDark,
+                        ),
+                        Divider(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text("المطلوب كاش من العميل:", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                            Text(
+                              "المطلوب كاش من العميل:",
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : AppColors.slateDark,
+                              ),
+                            ),
                             Text(
                               "${ord.totalCashToCollect.toStringAsFixed(0)} ج.م",
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF047857)),
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF10B981)),
                             ),
                           ],
                         ),
@@ -1270,9 +1565,9 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFECFDF5),
+                    color: isDark ? const Color(0xFF064E3B).withOpacity(0.35) : const Color(0xFFECFDF5),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                    border: Border.all(color: isDark ? const Color(0xFF047857) : const Color(0xFFA7F3D0)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1280,23 +1575,26 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text("المطلوب تحصيله كاش:", style: TextStyle(fontSize: 11, color: Color(0xFF065F46))),
+                          Text(
+                            "المطلوب تحصيله كاش:",
+                            style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46)),
+                          ),
                           Text(
                             "${ord.totalCashToCollect.toStringAsFixed(0)} ج.م",
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF047857)),
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF10B981)),
                           ),
                         ],
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFA7F3D0)),
+                          border: Border.all(color: isDark ? const Color(0xFF047857) : const Color(0xFFA7F3D0)),
                         ),
                         child: Text(
                           "+${ord.riderEarning.toStringAsFixed(0)} ج.م أجر التوصيل لك",
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF047857)),
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
                         ),
                       ),
                     ],
@@ -1368,6 +1666,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
     required Color iconColor,
     required bool isExpanded,
     required VoidCallback onTap,
+    required bool isDark,
   }) {
     return InkWell(
       onTap: onTap,
@@ -1375,9 +1674,9 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9).withOpacity(0.5),
+          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9).withOpacity(0.5),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
         ),
         child: Row(
           children: [
@@ -1387,15 +1686,32 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  Text(subtitle, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: isDark ? Colors.white : AppColors.slateDark,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
             ),
             Icon(
               isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
               size: 20,
-              color: const Color(0xFF64748B),
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
             ),
           ],
         ),
