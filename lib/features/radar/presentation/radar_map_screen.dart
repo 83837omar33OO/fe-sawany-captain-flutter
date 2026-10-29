@@ -4,11 +4,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/services/audio_alert_service.dart';
 import '../data/radar_repository.dart';
 import '../models/available_order.dart';
+import '../../active_delivery/models/active_order.dart';
+import '../../active_delivery/data/active_order_repository.dart';
 
 class RadarMapScreen extends StatefulWidget {
   final VoidCallback onOpenActiveTab;
@@ -22,14 +25,16 @@ class RadarMapScreen extends StatefulWidget {
 class _RadarMapScreenState extends State<RadarMapScreen> {
   final MapController _mapController = MapController();
   final _radarRepo = RadarRepository();
+  final _activeRepo = ActiveOrderRepository();
 
-  // Default coordinate: Al Ameriya 2 / Damanhour & Western Alexandria
+  // Default coordinate: Al Ameriya 2 / Damanhour
   LatLng _currentLocation = const LatLng(31.0185, 29.8130);
-  bool _isOnline = false; // Initialized gracefully, synced with server
+  bool _isOnline = false;
   bool _isToggling = false;
   bool _isClaiming = false;
 
   List<AvailableOrder> _availableOrders = [];
+  List<ActiveOrder> _activeOrders = [];
   int _lastKnownCount = 0;
   Timer? _pollingTimer;
 
@@ -66,9 +71,7 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
       );
       final newPos = LatLng(pos.latitude, pos.longitude);
       if (mounted) {
-        setState(() {
-          _currentLocation = newPos;
-        });
+        setState(() => _currentLocation = newPos);
         _mapController.move(newPos, 15.0);
       }
     } catch (_) {}
@@ -76,9 +79,10 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
 
   Future<void> _fetchRadarData({bool silent = false}) async {
     try {
-      final data = await _radarRepo.fetchRadarData();
-      final orders = data["orders"] as List<AvailableOrder>;
-      final isOnline = data["isOnline"] as bool? ?? false;
+      final radarData = await _radarRepo.fetchRadarData();
+      final orders = radarData["orders"] as List<AvailableOrder>;
+      final isOnline = radarData["isOnline"] as bool? ?? false;
+      final activeList = await _activeRepo.getActiveOrders();
 
       if (orders.length > _lastKnownCount) {
         AudioAlertService.triggerNewOrderAlert();
@@ -88,7 +92,7 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
       if (mounted) {
         setState(() {
           _availableOrders = orders;
-          // Only update duty if not actively in middle of toggle
+          _activeOrders = activeList;
           if (!_isToggling) _isOnline = isOnline;
         });
       }
@@ -148,9 +152,33 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
     }
   }
 
+  void _dialPhone(String phone) async {
+    if (phone.isEmpty) return;
+    final uri = Uri.parse("tel:$phone");
+    if (await canLaunchUrl(uri)) await launchUrl(uri);
+  }
+
+  void _openNavigation({double? lat, double? lng, required String addressQuery}) async {
+    Uri uri;
+    if (lat != null && lng != null && lat != 0 && lng != 0) {
+      uri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving");
+    } else {
+      final encoded = Uri.encodeComponent("$addressQuery, دمنهور, البحيرة, مصر");
+      uri = Uri.parse("https://www.google.com/maps/search/?api=1&query=$encoded");
+    }
+    if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hasActiveOrder = _activeOrders.isNotEmpty;
+    final ActiveOrder? primaryActive = hasActiveOrder ? _activeOrders.first : null;
+
+    final hasCustomerGps = primaryActive != null &&
+        primaryActive.customerLat != null &&
+        primaryActive.customerLng != null &&
+        primaryActive.customerLat != 0;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -194,6 +222,36 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
                         ),
                       ),
                     ),
+
+                    // Customer GPS Marker (if active delivery has GPS coordinates)
+                    if (hasCustomerGps)
+                      Marker(
+                        point: LatLng(primaryActive!.customerLat!, primaryActive.customerLng!),
+                        width: 130,
+                        height: 64,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0284C7),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.white, width: 1.5),
+                                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                              ),
+                              child: Text(
+                                "عميل: ${primaryActive.customerName}",
+                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const Icon(Icons.location_on, color: Color(0xFF0284C7), size: 30),
+                          ],
+                        ),
+                      ),
+
                     // Store Hub Markers
                     ..._hubPoints.map(
                       (hub) => Marker(
@@ -205,9 +263,7 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
                             color: Colors.white,
                             shape: BoxShape.circle,
                             border: Border.all(color: const Color(0xFF00875A), width: 2),
-                            boxShadow: const [
-                              BoxShadow(color: Colors.black26, blurRadius: 4),
-                            ],
+                            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
                           ),
                           child: const Icon(Icons.store_rounded, color: Color(0xFF00875A), size: 18),
                         ),
@@ -224,7 +280,6 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
                   children: [
-                    // Location Pill
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                       decoration: BoxDecoration(
@@ -241,7 +296,7 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
                           const Icon(Icons.location_on, size: 15, color: Color(0xFF10B981)),
                           const SizedBox(width: 5),
                           Text(
-                            "حي العامرية ثان • الناصرية",
+                            "نطاق دمنهور • الناصرية",
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -278,7 +333,7 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            _isOnline ? "رادار نشط" : "غير متاح",
+                            _isOnline ? "متصل بالرادار" : "غير متاح",
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
@@ -295,46 +350,79 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
               ),
             ),
 
-            // 3. Floating "تحديد موقعي" Button (Elevated on right)
+            // 3. Floating Quick Location Buttons
             Positioned(
               right: 16,
-              bottom: _isOnline && _availableOrders.isNotEmpty ? 190 : 110,
-              child: Material(
-                color: isDark ? const Color(0xFF0B132B) : Colors.white,
-                shape: const CircleBorder(),
-                elevation: 4,
-                shadowColor: Colors.black38,
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: _fetchLiveLocation,
-                  child: Padding(
-                    padding: const EdgeInsets.all(11),
-                    child: Icon(
-                      Icons.my_location_rounded,
-                      size: 22,
-                      color: isDark ? const Color(0xFF10B981) : const Color(0xFF00875A),
+              bottom: hasActiveOrder ? 230 : (_availableOrders.isNotEmpty ? 200 : 110),
+              child: Column(
+                children: [
+                  if (hasCustomerGps) ...[
+                    Material(
+                      color: const Color(0xFF0284C7),
+                      shape: const CircleBorder(),
+                      elevation: 4,
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () {
+                          _mapController.move(
+                            LatLng(primaryActive!.customerLat!, primaryActive.customerLng!),
+                            16.0,
+                          );
+                        },
+                        child: const Padding(
+                          padding: EdgeInsets.all(11),
+                          child: Icon(Icons.person_pin_circle, size: 22, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  Material(
+                    color: isDark ? const Color(0xFF0B132B) : Colors.white,
+                    shape: const CircleBorder(),
+                    elevation: 4,
+                    shadowColor: Colors.black38,
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: _fetchLiveLocation,
+                      child: Padding(
+                        padding: const EdgeInsets.all(11),
+                        child: Icon(
+                          Icons.my_location_rounded,
+                          size: 22,
+                          color: isDark ? const Color(0xFF10B981) : const Color(0xFF00875A),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
 
-            // 4. Incoming Order Card (If order waiting)
-            if (_isOnline && _availableOrders.isNotEmpty)
+            // 4. Mission Card for Active Order (Docked above bottom bar)
+            if (hasActiveOrder)
               Positioned(
                 left: 14,
                 right: 14,
-                bottom: 100,
+                bottom: 85,
+                child: _buildActiveOrderMissionCard(primaryActive!, isDark),
+              )
+            // 4b. Or Incoming Offer Card if no active order
+            else if (_isOnline && _availableOrders.isNotEmpty)
+              Positioned(
+                left: 14,
+                right: 14,
+                bottom: 85,
                 child: _buildIncomingOrderCard(_availableOrders.first, isDark),
               ),
 
-            // 5. Clean Docked Duty Sheet (Bottom docked control bar)
+            // 5. Docked Duty Sheet (Bottom docked control bar)
             Positioned(
               left: 0,
               right: 0,
               bottom: 0,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF0B132B) : Colors.white,
                   border: Border(
@@ -363,7 +451,209 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
     );
   }
 
-  // When Offline: Prominent Green "بدء الوردية" Button
+  // Active Mission Card (Docked on Map Screen)
+  Widget _buildActiveOrderMissionCard(ActiveOrder ord, bool isDark) {
+    final isOut = ord.status == "out_for_delivery";
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isOut ? const Color(0xFF0284C7) : const Color(0xFFD97706),
+          width: 1.5,
+        ),
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    isOut ? Icons.navigation_rounded : Icons.storefront_rounded,
+                    size: 16,
+                    color: isOut ? const Color(0xFF0284C7) : const Color(0xFFD97706),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    isOut ? "مهمة جارية: في الطريق للعميل" : "مهمة جارية: استلام من المحل",
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: isOut ? const Color(0xFF0284C7) : const Color(0xFFD97706),
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                "طلب #${ord.orderReference}",
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            isOut
+                ? "تسليم لـ: ${ord.customerName} • ${ord.customerAddress}"
+                : "استلام من: ${ord.storeName} (${ord.storeAddress})",
+            style: const TextStyle(fontSize: 11, color: Color(0xFF475569)),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isOut ? const Color(0xFF10B981) : const Color(0xFF0284C7),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () {
+                    if (isOut) {
+                      _openNavigation(
+                        lat: ord.customerLat,
+                        lng: ord.customerLng,
+                        addressQuery: ord.customerAddress,
+                      );
+                    } else {
+                      _openNavigation(addressQuery: "${ord.storeName} ${ord.storeAddress}");
+                    }
+                  },
+                  icon: const Icon(Icons.directions, size: 16),
+                  label: Text(
+                    isOut ? "ملاحة للعميل 🏠" : "ملاحة للمحل 🏬",
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF10B981),
+                  side: const BorderSide(color: Color(0xFF10B981)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () => _dialPhone(isOut ? ord.customerPhone : (ord.storePhone ?? ord.customerPhone)),
+                icon: const Icon(Icons.phone, size: 16),
+                label: const Text("اتصال", style: TextStyle(fontSize: 11)),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0F172A),
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: widget.onOpenActiveTab,
+                child: const Text("تفاصيل 📋", style: TextStyle(fontSize: 11)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIncomingOrderCard(AvailableOrder ord, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                ord.storeName,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : AppColors.slateDark,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  "+${ord.deliveryEarning.toStringAsFixed(0)} ج.م أرباحك",
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF047857),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "المحل: ${ord.storeArea} • التسليم: ${ord.deliveryArea}",
+            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryMint,
+                    foregroundColor: const Color(0xFF0F172A),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: _isClaiming ? null : () => _claimOrder(ord.id),
+                  child: _isClaiming
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0F172A)),
+                        )
+                      : const Text("⚡ قبول واستلام الطلب", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF64748B),
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: widget.onOpenActiveTab,
+                child: const Text("معاينة 📋", style: TextStyle(fontSize: 11)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildOfflineDutyBar() {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -373,7 +663,7 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF10B981),
             foregroundColor: const Color(0xFF0B132B),
-            minimumSize: const Size.fromHeight(48),
+            minimumSize: const Size.fromHeight(46),
             elevation: 0,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -394,7 +684,6 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
     );
   }
 
-  // When Online: Active Radar Status + Pause Option
   Widget _buildOnlineDutyBar(bool isDark) {
     return Row(
       children: [
@@ -406,18 +695,18 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
               Row(
                 children: [
                   Container(
-                    width: 9,
-                    height: 9,
+                    width: 8,
+                    height: 8,
                     decoration: const BoxDecoration(
                       color: Color(0xFF10B981),
                       shape: BoxShape.circle,
                     ),
                   ),
-                  const SizedBox(width: 7),
+                  const SizedBox(width: 6),
                   Text(
                     "أنت متصل وجاهز للعمل",
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.bold,
                       color: isDark ? Colors.white : AppColors.slateDark,
                     ),
@@ -426,13 +715,12 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
               ),
               const SizedBox(height: 2),
               Text(
-                _availableOrders.isEmpty
-                    ? "الرادار يبحث عن طلبات في نطاق العامرية..."
-                    : "يوجد ${_availableOrders.length} طلبات متاحة بالرادار",
-                style: TextStyle(
-                  fontSize: 11,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                ),
+                _activeOrders.isNotEmpty
+                    ? "لديك ${_activeOrders.length} طلبات جارية بعهدتك"
+                    : _availableOrders.isEmpty
+                        ? "الرادار يبحث عن طلبات جديدة..."
+                        : "يوجد ${_availableOrders.length} طلبات متاحة بالرادار",
+                style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
               ),
             ],
           ),
@@ -441,8 +729,8 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
           style: OutlinedButton.styleFrom(
             foregroundColor: const Color(0xFFEF4444),
             side: const BorderSide(color: Color(0xFFEF4444)),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
           icon: _isToggling
               ? const SizedBox(
@@ -458,81 +746,6 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
           onPressed: _isToggling ? null : _toggleDuty,
         ),
       ],
-    );
-  }
-
-  Widget _buildIncomingOrderCard(AvailableOrder ord, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
-        boxShadow: const [
-          BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                ord.storeName,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : AppColors.slateDark,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  "+${ord.deliveryEarning.toStringAsFixed(0)} ج.م أرباحك",
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF10B981),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          Text(
-            "المحل: ${ord.storeArea} • التسليم: ${ord.deliveryArea}",
-            style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            "كاش الفاتورة: ${ord.orderValue.toStringAsFixed(0)} ج.م",
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFF97316)),
-          ),
-          const SizedBox(height: 10),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF10B981),
-              foregroundColor: const Color(0xFF0B132B),
-              minimumSize: const Size.fromHeight(40),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: _isClaiming ? null : () => _claimOrder(ord.id),
-            child: _isClaiming
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0B132B)),
-                  )
-                : const Text("⚡ قبول واستلام الطلب فوراً", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
     );
   }
 }
