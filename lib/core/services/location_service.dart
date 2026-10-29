@@ -27,14 +27,20 @@ class LocationService {
       final hasPermission = await requestLocationPermission();
       if (!hasPermission) return null;
 
+      final lastKnown = await Geolocator.getLastKnownPosition();
+
       return await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.medium, // High battery efficiency
-          timeLimit: Duration(seconds: 10),
+          timeLimit: Duration(seconds: 5),
         ),
-      );
+      ).catchError((_) => lastKnown as Position);
     } catch (_) {
-      return null;
+      try {
+        return await Geolocator.getLastKnownPosition();
+      } catch (_) {
+        return null;
+      }
     }
   }
 }

@@ -278,47 +278,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
                                 ),
                         ),
-
-                        const SizedBox(height: 16),
-                        const Divider(color: Color(0xFF334155)),
-                        const SizedBox(height: 8),
-
-                        // Quick Account Switcher for Demo / Testing
-                        const Text(
-                          "أو اختر حساباً تجريبياً سريعاً:",
-                          style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(color: Color(0xFF38BDF8)),
-                                  foregroundColor: const Color(0xFF38BDF8),
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                                onPressed: () => _fillAccount("01034293703", "123456"),
-                                child: const Text("🛵 طيار عادي", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: OutlinedButton(
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(color: Color(0xFFFBBF24)),
-                                  foregroundColor: const Color(0xFFFBBF24),
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                                onPressed: () => _fillAccount("01000000000", "123456"),
-                                child: const Text("👑 مدير الطيارين", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                              ),
-                            ),
-                          ],
-                        ),
                       ],
                     ),
                   ),

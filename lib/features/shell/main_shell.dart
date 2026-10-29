@@ -27,8 +27,10 @@ class _MainShellState extends State<MainShell> {
 
   Future<void> _refreshActiveCount() async {
     try {
-      final list = await _activeRepo.getActiveOrders();
-      if (mounted) setState(() => _activeCount = list.length);
+      final data = await _activeRepo.fetchDeliveriesData();
+      final active = data["activeOrders"] as List? ?? [];
+      final available = data["availableOrders"] as List? ?? [];
+      if (mounted) setState(() => _activeCount = active.length + available.length);
     } catch (_) {}
   }
 

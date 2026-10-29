@@ -76,10 +76,11 @@ class ApiClient {
     }
 
     if (response.statusCode == 403 || response.statusCode == 401) {
+      final isSuspended = data["isSuspended"] == true || (data["error"]?.toString().contains("موقوف") ?? false);
       throw ApiException(
         data["error"] ?? "انتهت صلاحية الجلسة أو الحساب غير مصرح له",
         statusCode: response.statusCode,
-        code: "UNAUTHORIZED",
+        code: isSuspended ? "ACCOUNT_SUSPENDED" : "UNAUTHORIZED",
       );
     }
 

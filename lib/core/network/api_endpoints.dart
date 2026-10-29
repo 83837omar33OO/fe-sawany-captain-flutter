@@ -14,4 +14,5 @@ class ApiEndpoints {
   // Fleet Operations & Live GPS Tracking
   static const String fleet = "$baseUrl/api/rider/fleet";
   static const String location = "$baseUrl/api/rider/location";
+  static const String telemetry = "$baseUrl/api/riders/telemetry";
 }
