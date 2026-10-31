@@ -62,22 +62,22 @@ class _MainShellState extends State<MainShell> {
         ),
         bottomNavigationBar: Container(
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF0B132B) : Colors.white,
+            color: isDark ? AppColors.surfaceDark : Colors.white,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.4 : 0.06),
-                blurRadius: 10,
-                offset: const Offset(0, -3),
+                color: Colors.black.withOpacity(isDark ? 0.35 : 0.05),
+                blurRadius: 12,
+                offset: const Offset(0, -2),
               ),
             ],
             border: Border(
               top: BorderSide(
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                color: isDark ? AppColors.borderDark : AppColors.borderLight,
                 width: 1,
               ),
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: SafeArea(
             top: false,
             child: Row(
@@ -85,16 +85,16 @@ class _MainShellState extends State<MainShell> {
               children: [
                 _buildNavItem(
                   index: 0,
-                  icon: Icons.map_outlined,
-                  activeIcon: Icons.map_rounded,
-                  label: "الرادار والخريطة",
+                  icon: Icons.explore_outlined,
+                  activeIcon: Icons.explore_rounded,
+                  label: "الرادار",
                   isDark: isDark,
                 ),
                 _buildNavItem(
                   index: 1,
                   icon: Icons.delivery_dining_outlined,
                   activeIcon: Icons.delivery_dining_rounded,
-                  label: "الطلبات الجارية",
+                  label: "الطلبات",
                   isDark: isDark,
                   badgeCount: _activeCount,
                 ),
@@ -107,9 +107,9 @@ class _MainShellState extends State<MainShell> {
                 ),
                 _buildNavItem(
                   index: 3,
-                  icon: Icons.settings_outlined,
-                  activeIcon: Icons.settings_rounded,
-                  label: "الإعدادات",
+                  icon: Icons.person_outline_rounded,
+                  activeIcon: Icons.person_rounded,
+                  label: "حسابي",
                   isDark: isDark,
                 ),
               ],
@@ -130,24 +130,19 @@ class _MainShellState extends State<MainShell> {
   }) {
     final isSelected = _currentIndex == index;
     final activeColor = isDark ? AppColors.primaryMint : AppColors.primary;
-    final inactiveColor = isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8);
+    final inactiveColor = isDark ? AppColors.textMutedDark : AppColors.textMutedLight;
 
     return InkWell(
       onTap: () => _onTabSelected(index),
-      borderRadius: BorderRadius.circular(12),
-      splashColor: Colors.transparent,
-      highlightColor: Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(
-          horizontal: isSelected ? 12 : 8,
-          vertical: 6,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
-              ? (isDark ? const Color(0xFF162A3B) : const Color(0xFFECFDF5))
+              ? (isDark ? AppColors.primaryMint.withOpacity(0.12) : AppColors.primary.withOpacity(0.08))
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -157,7 +152,7 @@ class _MainShellState extends State<MainShell> {
               children: [
                 Icon(
                   isSelected ? activeIcon : icon,
-                  size: 22,
+                  size: 24,
                   color: isSelected ? activeColor : inactiveColor,
                 ),
                 if (badgeCount > 0)
@@ -167,10 +162,10 @@ class _MainShellState extends State<MainShell> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEF4444),
+                        color: AppColors.danger,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: isDark ? const Color(0xFF0B132B) : Colors.white,
+                          color: isDark ? AppColors.surfaceDark : Colors.white,
                           width: 1.5,
                         ),
                       ),
@@ -178,8 +173,8 @@ class _MainShellState extends State<MainShell> {
                         "$badgeCount",
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
@@ -190,8 +185,8 @@ class _MainShellState extends State<MainShell> {
             Text(
               label,
               style: TextStyle(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
                 color: isSelected ? activeColor : inactiveColor,
               ),
             ),
