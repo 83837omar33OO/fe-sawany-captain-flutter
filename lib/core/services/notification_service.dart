@@ -52,8 +52,6 @@ class NotificationService {
       ticker: 'طلب طارئ في ثواني',
     );
 
-    const details = NotificationSettings(android: androidDetails);
-
     await _plugin.show(
       orderId.hashCode,
       '🚨 طلب طارئ متاح في $area!',
