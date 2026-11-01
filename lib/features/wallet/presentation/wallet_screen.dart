@@ -315,13 +315,13 @@ class _WalletScreenState extends State<WalletScreen> {
                     ),
                     const SizedBox(height: 10),
 
-                    // 4. Ledger List
-                    if (_summary == null || _summary!.entries.isEmpty)
+                    // 4. Recent Completed Orders
+                    if (_summary == null || _summary!.recentCompleted.isEmpty)
                       Padding(
                         padding: const EdgeInsets.all(24.0),
                         child: Center(
                           child: Text(
-                            "لا توجد حركات مسجلة حتى الآن",
+                            "لا توجد طلبات مكتملة مسجلة اليوم",
                             style: TextStyle(
                               fontSize: 12,
                               color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
@@ -330,8 +330,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         ),
                       )
                     else
-                      ..._summary!.entries.map((entry) {
-                        final isEarn = entry.type == "earning" || entry.amount > 0;
+                      ..._summary!.recentCompleted.map((order) {
                         return Container(
                           margin: const EdgeInsets.only(bottom: 10),
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -345,15 +344,13 @@ class _WalletScreenState extends State<WalletScreen> {
                                 width: 36,
                                 height: 36,
                                 decoration: BoxDecoration(
-                                  color: isEarn
-                                      ? (isDark ? AppColors.primaryMint.withOpacity(0.15) : AppColors.primaryLight)
-                                      : (isDark ? AppColors.warning.withOpacity(0.15) : const Color(0xFFFEF3C7)),
+                                  color: isDark ? AppColors.primaryMint.withOpacity(0.15) : AppColors.primaryLight,
                                   shape: BoxShape.circle,
                                 ),
-                                child: Icon(
-                                  isEarn ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                                  size: 18,
-                                  color: isEarn ? AppColors.primary : AppColors.warning,
+                                child: const Icon(
+                                  Icons.check_circle_outline_rounded,
+                                  size: 20,
+                                  color: AppColors.primary,
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -362,14 +359,14 @@ class _WalletScreenState extends State<WalletScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      entry.description,
+                                      "${order.storeName} • طلب #${order.orderReference}",
                                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      entry.createdAt.isNotEmpty ? entry.createdAt : "اليوم",
+                                      "تحصيل: ${order.totalCollected.toStringAsFixed(0)} ج.م • ${order.completedAt.isNotEmpty ? order.completedAt : 'اليوم'}",
                                       style: TextStyle(
-                                        fontSize: 10,
+                                        fontSize: 11,
                                         color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
                                       ),
                                     ),
@@ -377,11 +374,11 @@ class _WalletScreenState extends State<WalletScreen> {
                                 ),
                               ),
                               Text(
-                                "${isEarn ? '+' : '-'}${entry.amount.abs().toStringAsFixed(0)} ج.م",
-                                style: TextStyle(
+                                "+${order.deliveryFee.toStringAsFixed(0)} ج.م",
+                                style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w900,
-                                  color: isEarn ? AppColors.primary : AppColors.warning,
+                                  color: AppColors.primary,
                                 ),
                               ),
                             ],
