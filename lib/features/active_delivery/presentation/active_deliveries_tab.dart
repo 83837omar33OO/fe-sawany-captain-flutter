@@ -352,127 +352,230 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
 
     await showDialog(
       context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          double calculatedSubtotal = 0;
+          for (final item in order.items) {
+            final key = item.productId ?? item.productName;
+            final ctrl = controllers[key];
+            final price = double.tryParse(ctrl?.text.trim() ?? "") ?? item.unitPrice;
+            calculatedSubtotal += (price * item.quantity);
+          }
+          final newEstimatedTotal = calculatedSubtotal + order.riderEarning + order.serviceFee;
+          final diff = newEstimatedTotal - order.totalCashToCollect;
+
+          return Directionality(
+            textDirection: TextDirection.rtl,
+            child: AlertDialog(
+              backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+              title: Row(
+                children: [
+                  const Icon(Icons.receipt_long_rounded, color: AppColors.warning, size: 24),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      "تعديل أسعار الفاتورة الفعلية",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.surfaceDarkHover : AppColors.primaryLight,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text("المجموع المقدر الجديد:", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            Text(
+                              "${newEstimatedTotal.toStringAsFixed(0)} ج.م (${diff >= 0 ? '+' : ''}${diff.toStringAsFixed(0)} ج)",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                                color: diff != 0 ? AppColors.warning : AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ...order.items.map((item) {
+                        final key = item.productId ?? item.productName;
+                        final ctrl = controllers[key];
+                        if (ctrl == null) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.productName,
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                    ),
+                                    Text(
+                                      "الكمية: ${item.quantity} • المسجل: ${item.unitPrice} ج.م",
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              SizedBox(
+                                width: 90,
+                                child: TextField(
+                                  controller: ctrl,
+                                  keyboardType: TextInputType.number,
+                                  onChanged: (_) => setDialogState(() {}),
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                  decoration: InputDecoration(
+                                    suffixText: "ج",
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text("إلغاء"),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    final List<Map<String, dynamic>> priceList = [];
+                    controllers.forEach((key, controller) {
+                      final val = double.tryParse(controller.text.trim());
+                      if (val != null) {
+                        priceList.add({"productId": key, "unitPrice": val});
+                      }
+                    });
+
+                    if (priceList.isNotEmpty) {
+                      setState(() => _isActionLoading = true);
+                      try {
+                        await _activeRepo.updatePricing(order.id, priceList);
+                        await _loadData();
+                        if (mounted) {
+                          _showPriceUpdateSuccessDialog(order, newEstimatedTotal, diff);
+                        }
+                      } catch (_) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("تعذر حفظ الأسعار، تحقق من الاتصال."),
+                              backgroundColor: AppColors.danger,
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (mounted) setState(() => _isActionLoading = false);
+                      }
+                    }
+                  },
+                  child: const Text("حفظ الفاتورة"),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showPriceUpdateSuccessDialog(ActiveOrder order, double newTotal, double diff) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
           title: Row(
+            children: const [
+              Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 24),
+              SizedBox(width: 8),
+              Text("تم تحديث الفاتورة بنجاح", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.receipt_long, color: AppColors.warning, size: 24),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  "تعديل أسعار الفاتورة الفعلية",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              Text(
+                "الإجمالي الجديد للعميل: ${newTotal.toStringAsFixed(0)} ج.م (${diff >= 0 ? '+' : ''}${diff.toStringAsFixed(0)} ج)",
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                "يُفضل إبلاغ العميل (${order.customerName}) بالقيمة الجديدة لتجنب أي التباس عند التسليم.",
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? AppColors.textMutedDark : AppColors.textSecondaryLight,
                 ),
               ),
             ],
           ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ...order.items.map((item) {
-                    final key = item.productId ?? item.productName;
-                    final ctrl = controllers[key];
-                    if (ctrl == null) return const SizedBox.shrink();
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.productName,
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                                ),
-                                Text(
-                                  "الكمية: ${item.quantity} • الحالي: ${item.unitPrice} ج.م",
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          SizedBox(
-                            width: 85,
-                            child: TextField(
-                              controller: ctrl,
-                              keyboardType: TextInputType.number,
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                              decoration: InputDecoration(
-                                suffixText: "ج",
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            ),
-          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text("إلغاء"),
+              child: const Text("لاحقاً"),
             ),
-            ElevatedButton(
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF25D366),
+                side: const BorderSide(color: Color(0xFF25D366)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _openWhatsApp(order.customerPhone, order.orderReference ?? order.id);
+              },
+              icon: const Icon(Icons.chat_bubble_rounded, size: 16),
+              label: const Text("واتساب"),
+            ),
+            ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              onPressed: () async {
+              onPressed: () {
                 Navigator.pop(ctx);
-                final List<Map<String, dynamic>> priceList = [];
-                controllers.forEach((key, controller) {
-                  final val = double.tryParse(controller.text.trim());
-                  if (val != null) {
-                    priceList.add({"productId": key, "unitPrice": val});
-                  }
-                });
-
-                if (priceList.isNotEmpty) {
-                  setState(() => _isActionLoading = true);
-                  try {
-                    await _activeRepo.updatePricing(order.id, priceList);
-                    await _loadData();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("تم تحديث أسعار الفاتورة بنجاح"),
-                          backgroundColor: AppColors.primary,
-                        ),
-                      );
-                    }
-                  } catch (_) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("تعذر حفظ الأسعار، تحقق من الاتصال."),
-                          backgroundColor: AppColors.danger,
-                        ),
-                      );
-                    }
-                  } finally {
-                    if (mounted) setState(() => _isActionLoading = false);
-                  }
-                }
+                _dialPhone(order.customerPhone);
               },
-              child: const Text("حفظ الفاتورة"),
+              icon: const Icon(Icons.phone_rounded, size: 16),
+              label: const Text("اتصال"),
             ),
           ],
         ),
@@ -840,6 +943,23 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                               color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
                             ),
                           ),
+                          if (ord.customerPhone.isNotEmpty) ...[
+                            const SizedBox(height: 3),
+                            Row(
+                              children: [
+                                const Icon(Icons.phone_iphone_rounded, size: 13, color: AppColors.primary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  ord.customerPhone,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? AppColors.primaryMint : AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                           if (ord.customerNotes != null && ord.customerNotes!.isNotEmpty) ...[
                             const SizedBox(height: 4),
                             Text(

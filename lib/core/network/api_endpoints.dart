@@ -1,6 +1,9 @@
 class ApiEndpoints {
-  // Main Production Server
-  static const String baseUrl = "https://fe-sawany.vercel.app";
+  // Official Production Server
+  static const String baseUrl = "https://fe-sawany.online";
+  
+  // High-Availability Fallback Server
+  static const String fallbackBaseUrl = "https://fe-sawany-backup-worker-zoxo-psi.vercel.app";
 
   // Auth
   static const String login = "$baseUrl/api/rider/auth/login";
