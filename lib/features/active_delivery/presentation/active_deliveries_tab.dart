@@ -5,8 +5,12 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/services/audio_alert_service.dart';
+import '../../../core/services/duty_controller.dart';
+import '../../../core/services/notification_service.dart';
+import '../../../core/services/order_filter_service.dart';
 import '../../../core/services/telemetry_service.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/utils/time_formatter.dart';
 import '../data/active_order_repository.dart';
 import '../models/active_order.dart';
 import '../../radar/models/available_order.dart';
@@ -102,14 +106,62 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
 
     try {
       final data = await _activeRepo.fetchDeliveriesData();
-      final List<ActiveOrder> active = data["activeOrders"] ?? [];
-      final List<AvailableOrder> available = data["availableOrders"] ?? [];
+      List<ActiveOrder> active = data["activeOrders"] ?? [];
+      List<AvailableOrder> available = data["availableOrders"] ?? [];
       final bool suspended = data["isSuspended"] == true;
       final int maxOrders = (data["rider"]?["maxActiveOrders"] as num?)?.toInt() ?? 1;
+      final bool isOnline = data["isOnline"] == true;
 
+      // 1. Filter out rejected orders
+      available = OrderFilterService().filter(available);
+
+      // 2. FIFO Order Priority Sorting (oldest order first)
+      available.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      active.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+      // 3. Audio & Notifications
       if (available.length > _lastAvailableCount && _lastAvailableCount >= 0) {
         AudioAlertService.triggerNewOrderAlert();
+        final latest = available.first;
+        if (isOnline) {
+          NotificationService().showNewOrderAlert(
+            orderId: latest.id,
+            orderRef: latest.orderReference ?? latest.id,
+            storeName: latest.storeName,
+            earning: latest.deliveryEarning,
+          );
+        } else {
+          NotificationService().showUrgentOrderAlert(
+            orderId: latest.id,
+            orderRef: latest.orderReference ?? latest.id,
+            area: latest.deliveryArea,
+            amount: latest.totalToCollect,
+          );
+        }
       }
+
+      // Check for delayed orders (> 20 mins)
+      for (final ord in available) {
+        if (TimeFormatter.isDelayed(ord.createdAt)) {
+          NotificationService().showDelayedOrderAlert(
+            orderId: ord.id,
+            orderRef: ord.orderReference ?? ord.id,
+            elapsedMinutes: TimeFormatter.elapsedMinutes(ord.createdAt),
+          );
+          break;
+        }
+      }
+      for (final ord in active) {
+        if (TimeFormatter.isDelayed(ord.createdAt)) {
+          NotificationService().showDelayedOrderAlert(
+            orderId: ord.id,
+            orderRef: ord.orderReference ?? ord.id,
+            elapsedMinutes: TimeFormatter.elapsedMinutes(ord.createdAt),
+          );
+          break;
+        }
+      }
+
       _lastAvailableCount = available.length;
 
       if (mounted) {
@@ -186,7 +238,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("تم قبول الطلب بنجاح! توجه للمحل الآن 🛵"),
+            content: Text("تم قبول الطلب بنجاح! 🛵"),
             backgroundColor: AppColors.primary,
           ),
         );
@@ -205,10 +257,49 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
   }
 
   Future<void> _handleReject(String orderId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text("رفض الطلب ✕", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          content: const Text("هل تريد رفض هذا الطلب واستبعاده من قائمتك؟", style: TextStyle(fontSize: 13)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text("تراجع"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.danger,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text("نعم، رفض"),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Immediately remove locally so the card vanishes instantly
+    await OrderFilterService().reject(orderId);
+    setState(() {
+      _availableOrders = OrderFilterService().filter(_availableOrders);
+    });
+
     setState(() => _isActionLoading = true);
     try {
       await _activeRepo.rejectOrder(orderId);
-      await _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("تم رفض الطلب واستبعاده"), backgroundColor: AppColors.primary),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -706,6 +797,66 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                 ),
               ),
 
+            // Shift & Battery Status Bar
+            ListenableBuilder(
+              listenable: DutyController(),
+              builder: (context, _) {
+                final duty = DutyController();
+                final totalCash = _activeOrders.fold<double>(0, (sum, o) => sum + o.totalCashToCollect);
+                final totalEarnings = _activeOrders.fold<double>(0, (sum, o) => sum + o.riderEarning);
+
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.surfaceDarkHover : const Color(0xFFF1F5F9),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            duty.isOnline ? "🟢 الوردية: ${duty.formattedShiftDuration}" : "⚪ أوفلاين",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: duty.isOnline
+                                  ? (isDark ? AppColors.primaryMint : AppColors.primary)
+                                  : (isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            "🔋 ${duty.formattedBattery}",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_activeOrders.isNotEmpty)
+                        Text(
+                          "إجمالي كاش: ${totalCash.toStringAsFixed(0)} ج.م (+${totalEarnings.toStringAsFixed(0)})",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            color: isDark ? AppColors.primaryMint : AppColors.primary,
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
             // Main Content Area
             Expanded(
               child: _isSuspended
@@ -812,7 +963,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 1. Header: Order Ref + Status Pill
+          // 1. Header: Order Ref + Exact Elapsed Time + Status Pill
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: Row(
@@ -837,6 +988,28 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                         color: isDark ? Colors.white : AppColors.textPrimaryLight,
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: TimeFormatter.isDelayed(ord.createdAt)
+                            ? (isDark ? AppColors.danger.withOpacity(0.2) : const Color(0xFFFEE2E2))
+                            : (isDark ? AppColors.surfaceDarkHover : const Color(0xFFF1F5F9)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        TimeFormatter.isDelayed(ord.createdAt)
+                            ? "⚠️ ${TimeFormatter.formatElapsedTime(ord.createdAt)}"
+                            : "⏱️ ${TimeFormatter.formatElapsedTime(ord.createdAt)}",
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: TimeFormatter.isDelayed(ord.createdAt)
+                              ? AppColors.danger
+                              : (isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 Container(
@@ -848,7 +1021,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    isOut ? "في الطريق للعميل 🛵" : "استلام من المحل 🏪",
+                    isOut ? "في الطريق 🛵" : "استلام 🏪",
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
@@ -998,7 +1171,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                     ),
                     onPressed: () => _dialPhone(ord.customerPhone),
                     icon: const Icon(Icons.phone_rounded, size: 16, color: AppColors.primary),
-                    label: const Text("اتصال", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    label: const Text("اتصال 📞", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1016,7 +1189,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                     ),
                     onPressed: () => _openWhatsApp(ord.customerPhone, ord.orderReference ?? ord.id),
                     icon: const Icon(Icons.chat_bubble_rounded, size: 16, color: Color(0xFF25D366)),
-                    label: const Text("واتساب", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    label: const Text("واتساب 💬", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1044,7 +1217,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                       }
                     },
                     icon: const Icon(Icons.near_me_rounded, size: 16, color: AppColors.info),
-                    label: const Text("ملاحة", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    label: const Text("الخريطة 🗺️", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -1136,16 +1309,17 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "المطلوب تحصيله كاش:",
+                      "المطلوب تحصيله كاش (مشتريات: ${ord.subtotal.toStringAsFixed(0)} + توصيل: ${ord.riderEarning.toStringAsFixed(0)}):",
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 10,
                         color: isDark ? AppColors.primaryMint : AppColors.primary,
                       ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       "${ord.totalCashToCollect.toStringAsFixed(0)} ج.م",
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 22,
                         fontWeight: FontWeight.w900,
                         color: isDark ? AppColors.primaryMint : AppColors.primary,
                       ),
@@ -1171,7 +1345,7 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
             ),
           ),
 
-          // 6. Primary Action Progression Button (52dp height)
+          // 6. Primary Action Progression Button (52dp height, punchy single-word + emoji)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
             child: Column(
@@ -1187,35 +1361,40 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                     onPressed: _isActionLoading ? null : () => _handlePickup(ord.id),
-                    icon: const Icon(Icons.check_circle_outline_rounded, size: 22),
+                    icon: const Icon(Icons.two_wheeler_rounded, size: 22),
                     label: const Text(
-                      "استلمت وبدء التوجه للعميل 🚀",
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                      "استلام 🛵",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
                       Expanded(
-                        child: TextButton.icon(
-                          style: TextButton.styleFrom(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
                             foregroundColor: AppColors.warning,
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            side: BorderSide(color: AppColors.warning.withOpacity(0.5)),
+                            minimumSize: const Size(0, 42),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           onPressed: () => _showUpdatePricingDialog(ord),
                           icon: const Icon(Icons.edit_note_rounded, size: 18),
-                          label: const Text("تعديل الفاتورة 📝", style: TextStyle(fontSize: 12)),
+                          label: const Text("تعديل 📝", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Expanded(
-                        child: TextButton.icon(
-                          style: TextButton.styleFrom(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
                             foregroundColor: AppColors.danger,
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            side: BorderSide(color: AppColors.danger.withOpacity(0.5)),
+                            minimumSize: const Size(0, 42),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           onPressed: () => _showException(ord.id),
                           icon: const Icon(Icons.warning_amber_rounded, size: 18),
-                          label: const Text("إبلاغ عن مشكلة ⚠️", style: TextStyle(fontSize: 12)),
+                          label: const Text("بلاغ ⚠️", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],
@@ -1230,21 +1409,23 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                     onPressed: _isActionLoading ? null : () => _handleComplete(ord),
-                    icon: const Icon(Icons.done_all_rounded, size: 22),
-                    label: Text(
-                      "تم التسليم والتحصيل (${ord.totalCashToCollect.toStringAsFixed(0)} ج.م) ✓",
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                    icon: const Icon(Icons.check_circle_rounded, size: 22),
+                    label: const Text(
+                      "تسليم ✅",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  TextButton.icon(
-                    style: TextButton.styleFrom(
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.danger,
-                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      side: BorderSide(color: AppColors.danger.withOpacity(0.5)),
+                      minimumSize: const Size.fromHeight(42),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () => _showException(ord.id),
                     icon: const Icon(Icons.warning_amber_rounded, size: 18),
-                    label: const Text("إبلاغ عن مشكلة في التوصيل", style: TextStyle(fontSize: 12)),
+                    label: const Text("بلاغ ⚠️", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ],
@@ -1274,20 +1455,50 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header: Store Name + Earnings Badge
+          // Header: Store Name + Exact Elapsed Time + Earnings Badge
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(
-                    offer.storeName,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                    ),
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          offer.storeName,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: TimeFormatter.isDelayed(offer.createdAt)
+                              ? (isDark ? AppColors.danger.withOpacity(0.2) : const Color(0xFFFEE2E2))
+                              : (isDark ? AppColors.surfaceDarkHover : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          TimeFormatter.isDelayed(offer.createdAt)
+                              ? "⚠️ ${TimeFormatter.formatElapsedTime(offer.createdAt)}"
+                              : "⏱️ ${TimeFormatter.formatElapsedTime(offer.createdAt)}",
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: TimeFormatter.isDelayed(offer.createdAt)
+                                ? AppColors.danger
+                                : (isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 Container(
@@ -1334,24 +1545,29 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
 
           const SizedBox(height: 10),
 
-          // Summary Numbers (Items & Cash)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+          // Summary Numbers (Items & Cash breakdown)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.surfaceDarkHover : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  "${offer.items.length} أصناف • ${offer.totalPiecesCount} قطع",
+                  "${offer.items.length} أصناف (مشتريات: ${offer.subtotal.toStringAsFixed(0)} + توصيل: ${offer.deliveryEarning.toStringAsFixed(0)})",
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
                   ),
                 ),
                 Text(
-                  "المطلوب كاش: ${offer.totalToCollect.toStringAsFixed(0)} ج.م",
+                  "المطلوب: ${offer.totalToCollect.toStringAsFixed(0)} ج.م",
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w900,
                     color: isDark ? AppColors.primaryMint : AppColors.primary,
                   ),
                 ),
@@ -1359,19 +1575,20 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
             ),
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          // Action Buttons (52dp)
+          // Action Buttons: Punchy, single-word + emoji
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Row(
               children: [
                 Expanded(
-                  child: ElevatedButton(
+                  flex: 3,
+                  child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: canClaim ? AppColors.primary : Colors.grey,
                       foregroundColor: Colors.white,
-                      minimumSize: const Size(0, 50),
+                      minimumSize: const Size(0, 48),
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
@@ -1382,27 +1599,32 @@ class _ActiveDeliveriesTabState extends State<ActiveDeliveriesTab>
                             : () {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text("الحد الأقصى ممتلئ ($_maxActiveOrders)."),
+                                    content: Text("الحد ممتلئ ($_maxActiveOrders)"),
                                     backgroundColor: AppColors.danger,
                                   ),
                                 );
                               },
-                    child: Text(
-                      canClaim ? "قبول واستلام الطلب ⚡" : "الحد ممتلئ ($_maxActiveOrders)",
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                    icon: const Icon(Icons.bolt_rounded, size: 20),
+                    label: Text(
+                      canClaim ? "قبول ⚡" : "ممتلئ ($_maxActiveOrders)",
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: isDark ? Colors.white : AppColors.textMutedLight,
-                    side: BorderSide(color: isDark ? AppColors.borderDark : AppColors.borderLight),
-                    minimumSize: const Size(0, 50),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                Expanded(
+                  flex: 2,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.danger,
+                      side: const BorderSide(color: AppColors.danger),
+                      minimumSize: const Size(0, 48),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    onPressed: _isActionLoading ? null : () => _handleReject(offer.id),
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    label: const Text("رفض ✕", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   ),
-                  onPressed: _isActionLoading ? null : () => _handleReject(offer.id),
-                  child: const Text("تخطي"),
                 ),
               ],
             ),

@@ -8,6 +8,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/services/audio_alert_service.dart';
+import '../../../core/services/duty_controller.dart';
+import '../../../core/services/notification_service.dart';
+import '../../../core/services/order_filter_service.dart';
+import '../../../core/utils/time_formatter.dart';
 import '../data/radar_repository.dart';
 import '../models/available_order.dart';
 import '../../active_delivery/models/active_order.dart';
@@ -80,13 +84,60 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
   Future<void> _fetchRadarData({bool silent = false}) async {
     try {
       final radarData = await _radarRepo.fetchRadarData();
-      final orders = radarData["orders"] as List<AvailableOrder>;
+      List<AvailableOrder> orders = radarData["orders"] as List<AvailableOrder>;
       final isOnline = radarData["isOnline"] as bool? ?? false;
       final activeList = await _activeRepo.getActiveOrders();
 
-      if (orders.length > _lastKnownCount) {
+      // 1. Filter out rejected orders
+      orders = OrderFilterService().filter(orders);
+
+      // 2. Sort by FIFO priority queue (oldest requested first)
+      orders.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      activeList.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+      // 3. Audio & Push Notifications
+      if (orders.length > _lastKnownCount && _lastKnownCount >= 0) {
         AudioAlertService.triggerNewOrderAlert();
+        final latest = orders.first;
+        if (isOnline) {
+          NotificationService().showNewOrderAlert(
+            orderId: latest.id,
+            orderRef: latest.orderReference ?? latest.id,
+            storeName: latest.storeName,
+            earning: latest.deliveryEarning,
+          );
+        } else {
+          NotificationService().showUrgentOrderAlert(
+            orderId: latest.id,
+            orderRef: latest.orderReference ?? latest.id,
+            area: latest.deliveryArea,
+            amount: latest.totalToCollect,
+          );
+        }
       }
+
+      // Check for delayed orders (> 20 mins)
+      for (final ord in orders) {
+        if (TimeFormatter.isDelayed(ord.createdAt)) {
+          NotificationService().showDelayedOrderAlert(
+            orderId: ord.id,
+            orderRef: ord.orderReference ?? ord.id,
+            elapsedMinutes: TimeFormatter.elapsedMinutes(ord.createdAt),
+          );
+          break;
+        }
+      }
+      for (final ord in activeList) {
+        if (TimeFormatter.isDelayed(ord.createdAt)) {
+          NotificationService().showDelayedOrderAlert(
+            orderId: ord.id,
+            orderRef: ord.orderReference ?? ord.id,
+            elapsedMinutes: TimeFormatter.elapsedMinutes(ord.createdAt),
+          );
+          break;
+        }
+      }
+
       _lastKnownCount = orders.length;
 
       if (mounted) {
@@ -104,6 +155,7 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
     final nextStatus = !_isOnline;
     try {
       await _radarRepo.toggleDuty(nextStatus);
+      await DutyController().setDutyStatus(nextStatus);
       if (mounted) {
         setState(() => _isOnline = nextStatus);
         AudioAlertService.triggerSuccessFeedback();
@@ -120,6 +172,53 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
       }
     } finally {
       if (mounted) setState(() => _isToggling = false);
+    }
+  }
+
+  Future<void> _rejectOrder(String orderId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text("رفض الطلب ✕", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          content: const Text("هل تريد رفض هذا الطلب واستبعاده من قائمتك؟", style: TextStyle(fontSize: 13)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text("تراجع"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.danger,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text("نعم، رفض"),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true) {
+      await OrderFilterService().reject(orderId);
+      setState(() {
+        _availableOrders = OrderFilterService().filter(_availableOrders);
+      });
+      try {
+        await _activeRepo.rejectOrder(orderId);
+      } catch (_) {}
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("تم رفض الطلب واستبعاده"),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+      }
     }
   }
 
@@ -274,77 +373,128 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
               ],
             ),
 
-            // 2. Sleek Floating Header Pill (Zone & Connection Status)
+            // 2. Sleek Floating Header Pill (Zone, Shift Duration & Real Battery)
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isDark ? AppColors.surfaceDark.withOpacity(0.95) : Colors.white.withOpacity(0.95),
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, 2)),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.location_on, size: 16, color: AppColors.primary),
-                          const SizedBox(width: 6),
-                          Text(
-                            "الناصرية القديمة",
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
+                child: ListenableBuilder(
+                  listenable: DutyController(),
+                  builder: (context, _) {
+                    final duty = DutyController();
+                    final isCharging = duty.isCharging;
+                    final batteryLevel = duty.batteryLevel;
 
-                    // Online/Offline Pill
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: _isOnline
-                            ? (isDark ? AppColors.primaryMint.withOpacity(0.18) : AppColors.primaryLight)
-                            : (isDark ? AppColors.surfaceDark : const Color(0xFFF1F5F9)),
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _isOnline ? AppColors.primary : AppColors.textMutedLight,
-                            ),
+                    return Row(
+                      children: [
+                        // Zone Pill
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppColors.surfaceDark.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, 2)),
+                            ],
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            _isOnline ? "متصل بالرادار" : "غير متاح",
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: _isOnline
-                                  ? (isDark ? AppColors.primaryMint : AppColors.primary)
-                                  : (isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.location_on, size: 15, color: AppColors.primary),
+                              const SizedBox(width: 4),
+                              Text(
+                                "الناصرية",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
+                        ),
+                        const SizedBox(width: 6),
+
+                        // Battery Pill (Real-Time)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppColors.surfaceDark.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isCharging
+                                    ? Icons.battery_charging_full_rounded
+                                    : (batteryLevel > 50
+                                        ? Icons.battery_full_rounded
+                                        : (batteryLevel > 20
+                                            ? Icons.battery_4_bar_rounded
+                                            : Icons.battery_alert_rounded)),
+                                size: 16,
+                                color: isCharging
+                                    ? AppColors.primaryMint
+                                    : (batteryLevel > 20 ? AppColors.primary : AppColors.danger),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                duty.formattedBattery,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const Spacer(),
+
+                        // Shift Timer / Duty Pill
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _isOnline
+                                ? (isDark ? AppColors.primaryMint.withOpacity(0.18) : AppColors.primaryLight)
+                                : (isDark ? AppColors.surfaceDark : const Color(0xFFF1F5F9)),
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: _isOnline ? AppColors.primary : AppColors.textMutedLight,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _isOnline ? "🟢 ${duty.formattedShiftDuration}" : "⚪ غير متاح",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: _isOnline
+                                      ? (isDark ? AppColors.primaryMint : AppColors.primary)
+                                      : (isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -559,6 +709,9 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
 
   // Incoming Order Card (Floating on Map)
   Widget _buildIncomingOrderCard(AvailableOrder ord, bool isDark) {
+    final isDelayed = TimeFormatter.isDelayed(ord.createdAt);
+    final elapsedStr = TimeFormatter.formatElapsedTime(ord.createdAt);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -576,15 +729,44 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Header with store name & Time Elapsed Badge
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                ord.storeName,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        ord.storeName,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: isDelayed
+                            ? (isDark ? AppColors.danger.withOpacity(0.2) : const Color(0xFFFEE2E2))
+                            : (isDark ? AppColors.surfaceDarkHover : const Color(0xFFF1F5F9)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        isDelayed ? "⚠️ $elapsedStr" : "⏱️ $elapsedStr",
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: isDelayed ? AppColors.danger : (isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Container(
@@ -613,54 +795,84 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "مشتريات: ${ord.subtotal.toStringAsFixed(0)} ج.م",
-                style: TextStyle(fontSize: 11, color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
-              ),
-              Text(
-                "المطلوب كاش: ${ord.totalToCollect.toStringAsFixed(0)} ج.م",
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? AppColors.primaryMint : AppColors.primary,
+
+          // Total Cash Breakdown
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.surfaceDarkHover : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "مشتريات: ${ord.subtotal.toStringAsFixed(0)} ج.م • توصيل: ${ord.deliveryEarning.toStringAsFixed(0)} ج.م",
+                  style: TextStyle(fontSize: 11, color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
                 ),
-              ),
-            ],
+                Text(
+                  "المطلوب كاش: ${ord.totalToCollect.toStringAsFixed(0)} ج.م",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? AppColors.primaryMint : AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
+
+          // Action Buttons: Punchy, single-word + emoji
           Row(
             children: [
               Expanded(
-                child: ElevatedButton(
+                flex: 3,
+                child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     minimumSize: const Size(0, 48),
+                    elevation: 0,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   onPressed: _isClaiming ? null : () => _claimOrder(ord.id),
-                  child: _isClaiming
+                  icon: const Icon(Icons.bolt_rounded, size: 20),
+                  label: _isClaiming
                       ? const SizedBox(
                           width: 18,
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : const Text("قبول واستلام الطلب ⚡", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                      : const Text("قبول ⚡", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
                 ),
               ),
               const SizedBox(width: 8),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 48),
-                  foregroundColor: isDark ? Colors.white : AppColors.textMutedLight,
-                  side: BorderSide(color: isDark ? AppColors.borderDark : AppColors.borderLight),
+              Expanded(
+                flex: 2,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    foregroundColor: AppColors.danger,
+                    side: const BorderSide(color: AppColors.danger),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: () => _rejectOrder(ord.id),
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  label: const Text("رفض ✕", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(44, 48),
+                  foregroundColor: isDark ? Colors.white : AppColors.textPrimaryLight,
+                  backgroundColor: isDark ? AppColors.surfaceDarkHover : const Color(0xFFF1F5F9),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
                 onPressed: widget.onOpenActiveTab,
-                child: const Text("معاينة"),
+                icon: const Icon(Icons.receipt_long_rounded, size: 20),
+                tooltip: "معاينة 📋",
               ),
             ],
           ),
@@ -686,79 +898,86 @@ class _RadarMapScreenState extends State<RadarMapScreen> {
             )
           : const Icon(Icons.power_settings_new_rounded, size: 22),
       label: Text(
-        _isToggling ? "جاري بدء الوردية..." : "بدء الوردية واستقبال الطلبات",
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+        _isToggling ? "جاري..." : "بدء الوردية 🟢",
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
       ),
       onPressed: _isToggling ? null : _toggleDuty,
     );
   }
 
   Widget _buildOnlineDutyBar(bool isDark) {
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
+    final duty = DutyController();
+
+    return ListenableBuilder(
+      listenable: duty,
+      builder: (context, _) {
+        return Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        "متصل • ${duty.formattedShiftDuration}",
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(height: 2),
                   Text(
-                    "أنت متصل وجاهز للعمل",
+                    _activeOrders.isNotEmpty
+                        ? "${_activeOrders.length} طلبات جارية • 🔋 ${duty.formattedBattery}"
+                        : _availableOrders.isEmpty
+                            ? "الرادار يبحث... • 🔋 ${duty.formattedBattery}"
+                            : "${_availableOrders.length} طلبات متاحة بالرادار",
                     style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                      fontSize: 11,
+                      color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                _activeOrders.isNotEmpty
-                    ? "لديك ${_activeOrders.length} طلبات جارية"
-                    : _availableOrders.isEmpty
-                        ? "الرادار يبحث عن طلبات جديدة..."
-                        : "يوجد ${_availableOrders.length} طلبات متاحة بالرادار",
-                style: TextStyle(
-                  fontSize: 11,
-                  color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
-                ),
+            ),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.danger,
+                side: const BorderSide(color: AppColors.danger),
+                minimumSize: const Size(0, 42),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-            ],
-          ),
-        ),
-        OutlinedButton.icon(
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.danger,
-            side: const BorderSide(color: AppColors.danger),
-            minimumSize: const Size(0, 42),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          icon: _isToggling
-              ? const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 1.8, color: AppColors.danger),
-                )
-              : const Icon(Icons.pause_circle_outline, size: 18),
-          label: Text(
-            _isToggling ? "لحظة..." : "إيقاف مؤقت",
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-          ),
-          onPressed: _isToggling ? null : _toggleDuty,
-        ),
-      ],
+              icon: _isToggling
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 1.8, color: AppColors.danger),
+                    )
+                  : const Icon(Icons.pause_circle_outline, size: 18),
+              label: Text(
+                _isToggling ? "لحظة..." : "إنهاء 🔴",
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              onPressed: _isToggling ? null : _toggleDuty,
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -130,13 +130,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    "منظومة التوصيل السريع والتحصيل الميداني",
+                    "بوابة الكابتن",
                     style: TextStyle(
-                      fontSize: 13,
-                      color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? AppColors.primaryMint : AppColors.primary,
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 24),
 
                   // Login Card (Unboxed, sleek Design System 3.0)
                   Container(
@@ -289,33 +290,40 @@ class _LoginScreenState extends State<LoginScreen> {
                                   child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
                                 )
                               : const Text(
-                                  "دخول لمنظومة الكابتن ⚡",
-                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+                                  "دخول ⚡",
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
                                 ),
                         ),
                       ],
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
-                  // Helpline Button
+                  // Helpline Button (Minimal & Concise)
                   InkWell(
                     onTap: _callSupervisor,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.surfaceDarkHover : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                        ),
+                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.support_agent_rounded, size: 18, color: AppColors.primary),
-                          const SizedBox(width: 8),
+                          const Icon(Icons.support_agent_rounded, size: 16, color: AppColors.primary),
+                          const SizedBox(width: 6),
                           Text(
-                            "غرفة العمليات والمشرف الميداني: 01034293703",
+                            "المشرف 📞",
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: isDark ? AppColors.textMutedDark : AppColors.textSecondaryLight,
+                              color: isDark ? Colors.white : AppColors.textPrimaryLight,
                             ),
                           ),
                         ],

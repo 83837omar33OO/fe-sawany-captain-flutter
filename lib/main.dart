@@ -3,11 +3,19 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/constants/app_strings.dart';
+import 'core/services/notification_service.dart';
+import 'core/services/duty_controller.dart';
+import 'core/services/order_filter_service.dart';
 import 'features/splash/presentation/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ThemeController.instance.init();
+  try {
+    await NotificationService().init();
+    await DutyController().init();
+    await OrderFilterService().load();
+  } catch (_) {}
   runApp(const FeSawanyCaptainApp());
 }
 
